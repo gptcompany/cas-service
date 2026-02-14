@@ -1,0 +1,19 @@
+[project]
+name = "cas-service"
+version = "0.1.0"
+description = "CAS microservice with SymPy + Maxima engines"
+requires-python = ">=3.11"
+dependencies = [
+    "sympy>=1.13",
+    "antlr4-python3-runtime==4.11.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short -q"
