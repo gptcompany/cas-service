@@ -10,6 +10,8 @@ Environment:
     CAS_PORT=8769              # HTTP listen port
     CAS_MAXIMA_PATH=/usr/bin/maxima  # Maxima binary path
     CAS_MAXIMA_TIMEOUT=10      # Maxima subprocess timeout (seconds)
+    CAS_MATLAB_PATH=/media/sam/3TB-WDC/matlab2025/bin/matlab  # MATLAB binary
+    CAS_MATLAB_TIMEOUT=30      # MATLAB subprocess timeout (seconds)
     CAS_SYMPY_TIMEOUT=5        # SymPy parse/simplify timeout (seconds)
     CAS_LOG_LEVEL=INFO         # Logging level
 """
@@ -25,6 +27,7 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
+from cas_service.engines.matlab_engine import MatlabEngine
 from cas_service.engines.maxima_engine import MaximaEngine
 from cas_service.engines.sympy_engine import SympyEngine
 from cas_service.preprocessing import preprocess_latex
@@ -189,12 +192,18 @@ def _init_engines() -> None:
     sympy_timeout = int(os.environ.get("CAS_SYMPY_TIMEOUT", "5"))
     maxima_path = os.environ.get("CAS_MAXIMA_PATH", "/usr/bin/maxima")
     maxima_timeout = int(os.environ.get("CAS_MAXIMA_TIMEOUT", "10"))
+    matlab_path = os.environ.get(
+        "CAS_MATLAB_PATH", "/media/sam/3TB-WDC/matlab2025/bin/matlab",
+    )
+    matlab_timeout = int(os.environ.get("CAS_MATLAB_TIMEOUT", "30"))
 
     sympy_engine = SympyEngine(timeout=sympy_timeout)
     maxima_engine = MaximaEngine(maxima_path=maxima_path, timeout=maxima_timeout)
+    matlab_engine = MatlabEngine(matlab_path=matlab_path, timeout=matlab_timeout)
 
     ENGINES["sympy"] = sympy_engine
     ENGINES["maxima"] = maxima_engine
+    ENGINES["matlab"] = matlab_engine
 
     for name, engine in ENGINES.items():
         available = engine.is_available()
