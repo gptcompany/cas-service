@@ -13,6 +13,8 @@ Environment:
     CAS_MATLAB_PATH=matlab                 # MATLAB binary (searches PATH)
     CAS_MATLAB_TIMEOUT=30      # MATLAB subprocess timeout (seconds)
     CAS_SYMPY_TIMEOUT=5        # SymPy parse/simplify timeout (seconds)
+    CAS_GAP_PATH=gap           # GAP binary path
+    CAS_GAP_TIMEOUT=10         # GAP subprocess timeout (seconds)
     CAS_LOG_LEVEL=INFO         # Logging level
 """
 
@@ -28,6 +30,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 from cas_service.engines.base import Capability, ComputeRequest
+from cas_service.engines.gap_engine import GapEngine
 from cas_service.engines.matlab_engine import MatlabEngine
 from cas_service.engines.maxima_engine import MaximaEngine
 from cas_service.engines.sympy_engine import SympyEngine
@@ -282,14 +285,18 @@ def _init_engines() -> None:
     maxima_timeout = int(os.environ.get("CAS_MAXIMA_TIMEOUT", "10"))
     matlab_path = os.environ.get("CAS_MATLAB_PATH", "matlab")
     matlab_timeout = int(os.environ.get("CAS_MATLAB_TIMEOUT", "30"))
+    gap_path = os.environ.get("CAS_GAP_PATH", "gap")
+    gap_timeout = int(os.environ.get("CAS_GAP_TIMEOUT", "10"))
 
     sympy_engine = SympyEngine(timeout=sympy_timeout)
     maxima_engine = MaximaEngine(maxima_path=maxima_path, timeout=maxima_timeout)
     matlab_engine = MatlabEngine(matlab_path=matlab_path, timeout=matlab_timeout)
+    gap_engine = GapEngine(gap_path=gap_path, timeout=gap_timeout)
 
     ENGINES["sympy"] = sympy_engine
     ENGINES["maxima"] = maxima_engine
     ENGINES["matlab"] = matlab_engine
+    ENGINES["gap"] = gap_engine
 
     for name, engine in ENGINES.items():
         available = engine.is_available()
