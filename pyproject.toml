@@ -8,11 +8,22 @@ dependencies = [
     "antlr4-python3-runtime==4.11.1",
 ]
 
+[project.scripts]
+cas-setup = "cas_service.setup.main:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
 ]
+setup = [
+    "questionary>=2.0",
+    "rich>=13.0",
+]
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
