@@ -1,12 +1,13 @@
+# Edit User, WorkingDirectory, and ExecStart to match your installation.
 [Unit]
 Description=CAS Microservice (SymPy + Maxima)
 After=network.target
 
 [Service]
 Type=simple
-User=sam
-WorkingDirectory=/media/sam/1TB/cas-service
-ExecStart=/home/sam/.local/bin/uv run python -m cas_service.main
+User=your-username
+WorkingDirectory=/path/to/cas-service
+ExecStart=/usr/local/bin/uv run python -m cas_service.main
 Restart=on-failure
 RestartSec=5
 Environment=CAS_PORT=8769

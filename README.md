@@ -37,8 +37,9 @@ Default port: **8769**
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET /health` | Health check |
-| `GET /engines` | List available CAS engines |
+| `GET /engines` | List available CAS engines (with capabilities) |
 | `POST /validate` | Validate a LaTeX formula |
+| `POST /compute` | Run a template-based compute task |
 
 ### Validate Example
 
@@ -47,6 +48,16 @@ curl -s -X POST http://localhost:8769/validate \
   -H "Content-Type: application/json" \
   -d '{"latex": "x^2 + 2*x + 1", "cas": "maxima"}' | jq .
 ```
+
+### Compute Example
+
+```bash
+curl -s -X POST http://localhost:8769/compute \
+  -H "Content-Type: application/json" \
+  -d '{"engine": "gap", "task_type": "template", "template": "group_order", "inputs": {"group_expr": "SymmetricGroup(4)"}}' | jq .
+```
+
+The `/compute` endpoint accepts template-only tasks. Each engine declares its capabilities (`validate`, `compute`, `remote`) via `/engines`.
 
 ## Engines
 

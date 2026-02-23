@@ -91,7 +91,7 @@ class MatlabEngine(BaseEngine):
 
     def __init__(
         self,
-        matlab_path: str = "/media/sam/3TB-WDC/matlab2025/bin/matlab",
+        matlab_path: str = "matlab",
         timeout: int = 30,
     ) -> None:
         self.matlab_path = matlab_path

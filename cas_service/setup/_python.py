@@ -5,10 +5,11 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 from rich.console import Console
 
-PROJECT_ROOT = "/media/sam/1TB/cas-service"
+PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 
 
 class PythonStep:

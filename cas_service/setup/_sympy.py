@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 from rich.console import Console
 
-PROJECT_ROOT = "/media/sam/1TB/cas-service"
+PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 MIN_VERSION = (1, 12)
 
 

@@ -264,9 +264,9 @@ class TestMatlabStep:
 
     @patch("cas_service.setup._matlab.os.access", return_value=True)
     @patch("cas_service.setup._matlab.os.path.isfile", return_value=True)
-    @patch("cas_service.setup._matlab.glob.glob", return_value=[])
+    @patch("cas_service.setup._matlab.glob.glob", return_value=["/usr/local/MATLAB/R2025a/bin/matlab"])
     def test_check_found_direct_path(self, mock_glob, mock_isfile, mock_access):
-        """check() returns True when MATLAB found at a direct path."""
+        """check() returns True when MATLAB found at a standard path."""
         step = self._make()
         assert step.check() is True
         assert step._found_path is not None

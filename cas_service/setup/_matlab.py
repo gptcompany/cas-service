@@ -9,7 +9,6 @@ from rich.console import Console
 
 # Common MATLAB binary locations across platforms
 _SEARCH_PATHS = [
-    "/media/sam/3TB-WDC/matlab2025/bin/matlab",
     "/usr/local/MATLAB/*/bin/matlab",
     "/Applications/MATLAB_*.app/bin/matlab",
     "/opt/MATLAB/*/bin/matlab",

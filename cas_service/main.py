@@ -10,7 +10,7 @@ Environment:
     CAS_PORT=8769              # HTTP listen port
     CAS_MAXIMA_PATH=/usr/bin/maxima  # Maxima binary path
     CAS_MAXIMA_TIMEOUT=10      # Maxima subprocess timeout (seconds)
-    CAS_MATLAB_PATH=/media/sam/3TB-WDC/matlab2025/bin/matlab  # MATLAB binary
+    CAS_MATLAB_PATH=matlab                 # MATLAB binary (searches PATH)
     CAS_MATLAB_TIMEOUT=30      # MATLAB subprocess timeout (seconds)
     CAS_SYMPY_TIMEOUT=5        # SymPy parse/simplify timeout (seconds)
     CAS_LOG_LEVEL=INFO         # Logging level
@@ -27,6 +27,7 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
+from cas_service.engines.base import Capability, ComputeRequest
 from cas_service.engines.matlab_engine import MatlabEngine
 from cas_service.engines.maxima_engine import MaximaEngine
 from cas_service.engines.sympy_engine import SympyEngine
@@ -61,6 +62,8 @@ class CASHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         if self.path == "/validate":
             self._handle_validate()
+        elif self.path == "/compute":
+            self._handle_compute()
         else:
             self._send_error("Not found", "NOT_FOUND", 404)
 
@@ -144,12 +147,97 @@ class CASHandler(BaseHTTPRequestHandler):
             "engines": engines_info,
         })
 
+    def _handle_compute(self) -> None:
+        data = self._read_json()
+        if data is None:
+            return
+
+        engine_name = data.get("engine")
+        if not engine_name:
+            self._send_error(
+                "engine field is required", "INVALID_REQUEST", 400,
+            )
+            return
+
+        if engine_name not in ENGINES:
+            self._send_error(
+                f"Unknown engine: {engine_name}",
+                "UNKNOWN_ENGINE", 422,
+                {"available": list(ENGINES.keys())},
+            )
+            return
+
+        task_type = data.get("task_type")
+        if task_type != "template":
+            self._send_error(
+                "task_type must be 'template'",
+                "INVALID_REQUEST", 400,
+            )
+            return
+
+        template = data.get("template")
+        if not template:
+            self._send_error(
+                "template field is required", "INVALID_REQUEST", 400,
+            )
+            return
+
+        inputs = data.get("inputs", {})
+        if not isinstance(inputs, dict):
+            self._send_error(
+                "inputs must be an object", "INVALID_REQUEST", 400,
+            )
+            return
+
+        timeout_s = data.get("timeout_s", 5)
+        if not isinstance(timeout_s, (int, float)) or timeout_s <= 0:
+            self._send_error(
+                "timeout_s must be a positive number", "INVALID_REQUEST", 400,
+            )
+            return
+
+        engine = ENGINES[engine_name]
+        if Capability.COMPUTE not in engine.capabilities:
+            self._send_error(
+                f"Engine '{engine_name}' does not support compute",
+                "NOT_IMPLEMENTED", 400,
+            )
+            return
+
+        if not engine.is_available():
+            self._send_error(
+                f"Engine '{engine_name}' is not available",
+                "ENGINE_UNAVAILABLE", 503,
+            )
+            return
+
+        request = ComputeRequest(
+            engine=engine_name,
+            task_type=task_type,
+            template=template,
+            inputs={str(k): str(v) for k, v in inputs.items()},
+            timeout_s=int(timeout_s),
+        )
+        result = engine.compute(request)
+
+        self._send_json({
+            "engine": result.engine,
+            "success": result.success,
+            "time_ms": result.time_ms,
+            "result": result.result,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "error": result.error,
+            "error_code": result.error_code,
+        })
+
     def _handle_engines(self) -> None:
         engine_list = []
         for name, engine in ENGINES.items():
             engine_list.append({
                 "name": name,
                 "available": engine.is_available(),
+                "capabilities": [c.value for c in engine.capabilities],
                 "description": engine.__class__.__doc__ or "",
             })
         self._send_json({"engines": engine_list})
@@ -192,9 +280,7 @@ def _init_engines() -> None:
     sympy_timeout = int(os.environ.get("CAS_SYMPY_TIMEOUT", "5"))
     maxima_path = os.environ.get("CAS_MAXIMA_PATH", "/usr/bin/maxima")
     maxima_timeout = int(os.environ.get("CAS_MAXIMA_TIMEOUT", "10"))
-    matlab_path = os.environ.get(
-        "CAS_MATLAB_PATH", "/media/sam/3TB-WDC/matlab2025/bin/matlab",
-    )
+    matlab_path = os.environ.get("CAS_MATLAB_PATH", "matlab")
     matlab_timeout = int(os.environ.get("CAS_MATLAB_TIMEOUT", "30"))
 
     sympy_engine = SympyEngine(timeout=sympy_timeout)

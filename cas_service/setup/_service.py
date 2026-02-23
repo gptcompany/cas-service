@@ -9,7 +9,9 @@ import subprocess
 import questionary
 from rich.console import Console
 
-PROJECT_ROOT = "/media/sam/1TB/cas-service"
+from pathlib import Path
+
+PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 UNIT_FILE_SRC = os.path.join(PROJECT_ROOT, "cas-service.service")
 UNIT_FILE_DST = "/etc/systemd/system/cas-service.service"
 

@@ -33,8 +33,7 @@ class VerifyStep:
             console.print()
             console.print("  Start it with:")
             console.print(
-                "    cd /media/sam/1TB/cas-service && "
-                "uv run python -m cas_service.main"
+                "    uv run python -m cas_service.main"
             )
             console.print("  Or:")
             console.print("    sudo systemctl start cas-service")
