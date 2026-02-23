@@ -15,6 +15,8 @@ Environment:
     CAS_SYMPY_TIMEOUT=5        # SymPy parse/simplify timeout (seconds)
     CAS_GAP_PATH=gap           # GAP binary path
     CAS_GAP_TIMEOUT=10         # GAP subprocess timeout (seconds)
+    CAS_WOLFRAMALPHA_APPID=    # WolframAlpha API key (optional)
+    CAS_WOLFRAMALPHA_TIMEOUT=10 # WolframAlpha request timeout (seconds)
     CAS_LOG_LEVEL=INFO         # Logging level
 """
 
@@ -34,6 +36,7 @@ from cas_service.engines.gap_engine import GapEngine
 from cas_service.engines.matlab_engine import MatlabEngine
 from cas_service.engines.maxima_engine import MaximaEngine
 from cas_service.engines.sympy_engine import SympyEngine
+from cas_service.engines.wolframalpha_engine import WolframAlphaEngine
 from cas_service.preprocessing import preprocess_latex
 
 logger = logging.getLogger(__name__)
@@ -237,12 +240,16 @@ class CASHandler(BaseHTTPRequestHandler):
     def _handle_engines(self) -> None:
         engine_list = []
         for name, engine in ENGINES.items():
-            engine_list.append({
+            entry: dict[str, Any] = {
                 "name": name,
                 "available": engine.is_available(),
                 "capabilities": [c.value for c in engine.capabilities],
                 "description": engine.__class__.__doc__ or "",
-            })
+            }
+            reason = getattr(engine, "availability_reason", None)
+            if reason is not None:
+                entry["availability_reason"] = reason
+            engine_list.append(entry)
         self._send_json({"engines": engine_list})
 
     def _send_json(self, data: dict, status: int = 200) -> None:
@@ -287,16 +294,20 @@ def _init_engines() -> None:
     matlab_timeout = int(os.environ.get("CAS_MATLAB_TIMEOUT", "30"))
     gap_path = os.environ.get("CAS_GAP_PATH", "gap")
     gap_timeout = int(os.environ.get("CAS_GAP_TIMEOUT", "10"))
+    wa_app_id = os.environ.get("CAS_WOLFRAMALPHA_APPID", "")
+    wa_timeout = int(os.environ.get("CAS_WOLFRAMALPHA_TIMEOUT", "10"))
 
     sympy_engine = SympyEngine(timeout=sympy_timeout)
     maxima_engine = MaximaEngine(maxima_path=maxima_path, timeout=maxima_timeout)
     matlab_engine = MatlabEngine(matlab_path=matlab_path, timeout=matlab_timeout)
     gap_engine = GapEngine(gap_path=gap_path, timeout=gap_timeout)
+    wa_engine = WolframAlphaEngine(app_id=wa_app_id, timeout=wa_timeout)
 
     ENGINES["sympy"] = sympy_engine
     ENGINES["maxima"] = maxima_engine
     ENGINES["matlab"] = matlab_engine
     ENGINES["gap"] = gap_engine
+    ENGINES["wolframalpha"] = wa_engine
 
     for name, engine in ENGINES.items():
         available = engine.is_available()
