@@ -1077,13 +1077,33 @@ Template:
   - pytest 125/125 pass
 - Next step: Step 4 — PePeRS Integration Phase 1 (or Slice D WolframAlpha)
 
+### 2026-02-24 — cas-service — Slice D (WolframAlpha)
+- Checkpoint: D-WA-CAS-DONE
+- Changes:
+  - `cas_service/engines/wolframalpha_engine.py`: 3 templates (evaluate, solve, simplify)
+  - Feature-gated via CAS_WOLFRAMALPHA_APPID env
+  - `/engines` shows availability_reason when disabled
+  - Not part of /validate consensus
+  - 21 new tests in `tests/test_wolframalpha_engine.py`
+- Validation:
+  - pytest 146/146 pass
+- Next step: Slice E
+
+### 2026-02-24 — cas-service — Slice E (Sage-Ready Runtime)
+- Checkpoint: E-RUNTIME-DONE
+- Changes:
+  - `cas_service/runtime/executor.py`: SubprocessExecutor (sync + async)
+  - Job lifecycle: pending/running/completed/failed/cancelled/timeout
+  - Output caps, eviction, thread-safe job registry
+  - 19 new tests in `tests/test_runtime_executor.py`
+- Validation:
+  - pytest 165/165 pass
+- Next step: PePeRS Integration (Step 4 P1 + Step 5 P2)
+
 ## 9. Suggested Next Action (Immediate)
 
-If resuming in `cas-service`, start with:
-- **Step 6 / Slice D** (WolframAlpha optional engine)
+All 5 cas-service slices complete (A+B+C+D+E). Remaining work:
 
 If resuming in `PePeRS`, start with:
 - **Step 4 / P1** (CAS client + capability discovery)
-
-If rate limit is still tight and you want low-token work first:
-- ask Claude Code to implement only the `BaseEngine` + `/engines` capability extension before the full `/compute` endpoint
+- **Step 5 / P2** (Routing algebra tasks to /compute)
