@@ -1,6 +1,6 @@
 # Edit User, WorkingDirectory, and ExecStart to match your installation.
 [Unit]
-Description=CAS Microservice (SymPy + Maxima)
+Description=CAS Microservice (SymPy + Maxima + GAP)
 After=network.target
 
 [Service]
@@ -12,6 +12,10 @@ Restart=on-failure
 RestartSec=5
 Environment=CAS_PORT=8769
 Environment=CAS_MAXIMA_PATH=/usr/bin/maxima
+# Environment=CAS_GAP_PATH=gap
+# Environment=CAS_GAP_TIMEOUT=10
+# Environment=CAS_WOLFRAMALPHA_APPID=  # optional, get at developer.wolframalpha.com
+# Environment=CAS_SAGE_PATH=sage       # future
 Environment=CAS_LOG_LEVEL=INFO
 
 [Install]

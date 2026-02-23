@@ -26,10 +26,13 @@ BANNER = r"""
 
 def _all_steps() -> list:
     """Return the full ordered list of setup steps."""
+    from cas_service.setup._gap import GapStep
     from cas_service.setup._python import PythonStep
     from cas_service.setup._maxima import MaximaStep
     from cas_service.setup._matlab import MatlabStep
+    from cas_service.setup._sage import SageStep
     from cas_service.setup._sympy import SympyStep
+    from cas_service.setup._wolframalpha import WolframAlphaStep
     from cas_service.setup._service import ServiceStep
     from cas_service.setup._verify import VerifyStep
 
@@ -37,7 +40,10 @@ def _all_steps() -> list:
         PythonStep(),
         SympyStep(),
         MaximaStep(),
+        GapStep(),
         MatlabStep(),
+        SageStep(),
+        WolframAlphaStep(),
         ServiceStep(),
         VerifyStep(),
     ]
@@ -45,14 +51,20 @@ def _all_steps() -> list:
 
 def _engine_steps() -> list:
     """Return engine-only setup steps."""
+    from cas_service.setup._gap import GapStep
     from cas_service.setup._maxima import MaximaStep
     from cas_service.setup._matlab import MatlabStep
+    from cas_service.setup._sage import SageStep
     from cas_service.setup._sympy import SympyStep
+    from cas_service.setup._wolframalpha import WolframAlphaStep
 
     return [
         SympyStep(),
         MaximaStep(),
+        GapStep(),
         MatlabStep(),
+        SageStep(),
+        WolframAlphaStep(),
     ]
 
 
@@ -71,7 +83,7 @@ def _verify_steps() -> list:
 
 
 SUBCOMMANDS = {
-    "engines": (_engine_steps, "Check CAS engines (SymPy, Maxima, MATLAB)"),
+    "engines": (_engine_steps, "Check CAS engines (SymPy, Maxima, GAP, MATLAB, Sage, WA)"),
     "service": (_service_steps, "Configure service deployment"),
     "verify": (_verify_steps, "Verify running service health"),
 }

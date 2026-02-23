@@ -873,7 +873,7 @@ class TestMain:
         main(args=[])
         mock_run_steps.assert_called_once()
         steps = mock_run_steps.call_args[0][0]
-        assert len(steps) == 6  # Python, SymPy, Maxima, MATLAB, Service, Verify
+        assert len(steps) == 9  # Python, SymPy, Maxima, GAP, MATLAB, Sage, WA, Service, Verify
 
     @patch("cas_service.setup.main.run_steps", return_value=True)
     @patch("cas_service.setup.main.Console")
@@ -885,7 +885,7 @@ class TestMain:
         main(args=["engines"])
         mock_run_steps.assert_called_once()
         steps = mock_run_steps.call_args[0][0]
-        assert len(steps) == 3  # SymPy, Maxima, MATLAB
+        assert len(steps) == 6  # SymPy, Maxima, GAP, MATLAB, Sage, WA
 
     @patch("cas_service.setup.main.run_steps", return_value=True)
     @patch("cas_service.setup.main.Console")
