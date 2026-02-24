@@ -35,6 +35,7 @@ from cas_service.engines.base import Capability, ComputeRequest
 from cas_service.engines.gap_engine import GapEngine
 from cas_service.engines.matlab_engine import MatlabEngine
 from cas_service.engines.maxima_engine import MaximaEngine
+from cas_service.engines.sage_engine import SageEngine
 from cas_service.engines.sympy_engine import SympyEngine
 from cas_service.engines.wolframalpha_engine import WolframAlphaEngine
 from cas_service.preprocessing import preprocess_latex
@@ -294,6 +295,8 @@ def _init_engines() -> None:
     matlab_timeout = int(os.environ.get("CAS_MATLAB_TIMEOUT", "30"))
     gap_path = os.environ.get("CAS_GAP_PATH", "gap")
     gap_timeout = int(os.environ.get("CAS_GAP_TIMEOUT", "10"))
+    sage_path = os.environ.get("CAS_SAGE_PATH", "sage")
+    sage_timeout = int(os.environ.get("CAS_SAGE_TIMEOUT", "30"))
     wa_app_id = os.environ.get("CAS_WOLFRAMALPHA_APPID", "")
     wa_timeout = int(os.environ.get("CAS_WOLFRAMALPHA_TIMEOUT", "10"))
 
@@ -301,12 +304,14 @@ def _init_engines() -> None:
     maxima_engine = MaximaEngine(maxima_path=maxima_path, timeout=maxima_timeout)
     matlab_engine = MatlabEngine(matlab_path=matlab_path, timeout=matlab_timeout)
     gap_engine = GapEngine(gap_path=gap_path, timeout=gap_timeout)
+    sage_engine = SageEngine(sage_path=sage_path, timeout=sage_timeout)
     wa_engine = WolframAlphaEngine(app_id=wa_app_id, timeout=wa_timeout)
 
     ENGINES["sympy"] = sympy_engine
     ENGINES["maxima"] = maxima_engine
     ENGINES["matlab"] = matlab_engine
     ENGINES["gap"] = gap_engine
+    ENGINES["sage"] = sage_engine
     ENGINES["wolframalpha"] = wa_engine
 
     for name, engine in ENGINES.items():
