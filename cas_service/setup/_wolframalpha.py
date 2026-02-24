@@ -6,7 +6,7 @@ import os
 
 from rich.console import Console
 
-from cas_service.setup._config import get_key, write_key
+from cas_service.setup._config import env_path, get_key, write_key
 
 
 class WolframAlphaStep:
@@ -43,9 +43,10 @@ class WolframAlphaStep:
             pass
 
         console.print("  WolframAlpha is [bold]optional[/] — the service works without it.")
-        console.print("  To enable:")
+        console.print("  To enable later:")
         console.print("    1. Get an AppID at https://developer.wolframalpha.com/")
-        console.print("    2. Re-run: cas-setup configure")
+        console.print(f"    2. Add CAS_WOLFRAMALPHA_APPID=<your-appid> to: [bold]{env_path()}[/]")
+        console.print("    3. Or re-run: [bold]cas-setup configure[/]")
         return True  # Optional — always passes
 
     def verify(self) -> bool:

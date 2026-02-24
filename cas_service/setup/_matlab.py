@@ -7,7 +7,7 @@ import os
 
 from rich.console import Console
 
-from cas_service.setup._config import get_key, write_key
+from cas_service.setup._config import env_path, get_key, write_key
 
 # Common MATLAB binary locations across platforms
 _SEARCH_PATHS = [
@@ -17,6 +17,9 @@ _SEARCH_PATHS = [
     os.path.expanduser("~/MATLAB/*/bin/matlab"),
     "/media/*/matlab*/bin/matlab",
     "/media/*/*/matlab*/bin/matlab",
+    "/media/*/MATLAB/*/bin/matlab",
+    "/media/*/*/MATLAB/*/bin/matlab",
+    "/Volumes/*/MATLAB*/bin/matlab",
 ]
 
 
@@ -74,6 +77,9 @@ class MatlabStep:
 
         console.print(
             "  [yellow]MATLAB not found — skipping (this is fine).[/]"
+        )
+        console.print(
+            f"  To add later, set CAS_MATLAB_PATH in: [bold]{env_path()}[/]"
         )
         return False
 

@@ -41,6 +41,12 @@ class ServiceStep:
 
     def install(self, console: Console) -> bool:
         """Offer systemd or foreground deployment."""
+        if not shutil.which("systemctl"):
+            # No systemd (macOS, containers, etc.) — foreground only
+            console.print("  [dim]systemd not available — using foreground mode.[/]")
+            self._mode = "foreground"
+            return self._show_foreground(console)
+
         self._mode = questionary.select(
             "How do you want to run the CAS service?",
             choices=["systemd (recommended)", "foreground"],

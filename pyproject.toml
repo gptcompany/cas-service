@@ -1,7 +1,7 @@
 [project]
 name = "cas-service"
 version = "0.1.0"
-description = "CAS microservice with SymPy + Maxima engines"
+description = "Multi-engine CAS microservice — Sage, SymPy, MATLAB, WolframAlpha"
 requires-python = ">=3.11"
 dependencies = [
     "sympy>=1.13",

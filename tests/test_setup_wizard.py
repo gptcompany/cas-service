@@ -414,11 +414,12 @@ class TestServiceStep:
     @patch("cas_service.setup._service.shutil.which", return_value=None)
     @patch("cas_service.setup._service.os.path.isfile", return_value=True)
     @patch("cas_service.setup._service.questionary")
-    def test_install_systemd_no_systemctl(self, mock_q, mock_isfile, mock_which):
-        """install() returns False when systemctl is not available."""
-        mock_q.select.return_value.ask.return_value = "systemd (recommended)"
+    def test_install_no_systemctl_falls_back_to_foreground(self, mock_q, mock_isfile, mock_which):
+        """install() falls back to foreground when systemctl is not available."""
         step = self._make()
-        assert step.install(_console()) is False
+        assert step.install(_console()) is True
+        assert step._mode == "foreground"
+        mock_q.select.assert_not_called()
 
     @patch(
         "cas_service.setup._service.subprocess.run",
