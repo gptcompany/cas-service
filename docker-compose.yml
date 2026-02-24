@@ -1,0 +1,26 @@
+services:
+  cas-service:
+    build: .
+    ports:
+      - "${CAS_PORT:-8769}:${CAS_PORT:-8769}"
+    environment:
+      - CAS_PORT=${CAS_PORT:-8769}
+      - CAS_DEFAULT_ENGINE
+      - CAS_SYMPY_TIMEOUT
+      - CAS_SAGE_PATH
+      - CAS_SAGE_TIMEOUT
+      - CAS_MATLAB_PATH
+      - CAS_MATLAB_TIMEOUT
+      - CAS_WOLFRAMALPHA_APPID
+      - CAS_WOLFRAMALPHA_TIMEOUT
+      - CAS_LOG_LEVEL
+    # Per MATLAB: decommentare e impostare il path host
+    # volumes:
+    #   - /usr/local/MATLAB:/opt/matlab:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${CAS_PORT:-8769}/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

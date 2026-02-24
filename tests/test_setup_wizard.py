@@ -350,9 +350,10 @@ class TestServiceStep:
 
     # -- check ---------------------------------------------------------------
 
+    @patch("cas_service.setup._service.ServiceStep._is_docker_running", return_value=False)
     @patch("cas_service.setup._service.subprocess.run")
     @patch("cas_service.setup._service.os.path.isfile", return_value=True)
-    def test_check_enabled(self, mock_isfile, mock_run):
+    def test_check_enabled(self, mock_isfile, mock_run, _mock_docker):
         """check() returns True when unit file exists and service is enabled."""
         mock_run.return_value = _completed(0, stdout="enabled\n")
         step = self._make()
@@ -364,9 +365,10 @@ class TestServiceStep:
         step = self._make()
         assert step.check() is False
 
+    @patch("cas_service.setup._service.ServiceStep._is_docker_running", return_value=False)
     @patch("cas_service.setup._service.subprocess.run")
     @patch("cas_service.setup._service.os.path.isfile", return_value=True)
-    def test_check_disabled(self, mock_isfile, mock_run):
+    def test_check_disabled(self, mock_isfile, mock_run, _mock_docker):
         """check() returns False when service is disabled."""
         mock_run.return_value = _completed(0, stdout="disabled\n")
         step = self._make()
@@ -384,12 +386,13 @@ class TestServiceStep:
 
     # -- install (systemd) ---------------------------------------------------
 
+    @patch("cas_service.setup._service.ServiceStep._has_docker_compose", return_value=False)
     @patch("cas_service.setup._service.subprocess.run")
     @patch("cas_service.setup._service.shutil.which", return_value="/usr/bin/systemctl")
     @patch("cas_service.setup._service.os.path.isfile", return_value=True)
     @patch("cas_service.setup._service.questionary")
     def test_install_systemd_success(
-        self, mock_q, mock_isfile, mock_which, mock_run
+        self, mock_q, mock_isfile, mock_which, mock_run, _mock_docker
     ):
         """install() successfully sets up systemd service."""
         mock_q.select.return_value.ask.return_value = "systemd (recommended)"

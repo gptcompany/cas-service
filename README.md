@@ -126,6 +126,29 @@ curl -s -X POST http://localhost:8769/compute \
 
 ## Deployment
 
+### Docker Compose
+
+```bash
+docker compose build
+dotenvx run -f .env -- docker compose up -d
+curl -s localhost:8769/health | jq .
+```
+
+The `.env` file is encrypted with dotenvx. `dotenvx run` decrypts it and passes the environment variables to the container. If you don't use dotenvx, pass variables manually:
+
+```bash
+CAS_WOLFRAMALPHA_APPID=your-key docker compose up -d
+```
+
+To mount a MATLAB installation, uncomment the volumes section in `docker-compose.yml`:
+
+```yaml
+volumes:
+  - /usr/local/MATLAB:/opt/matlab:ro
+```
+
+Stop: `docker compose down`
+
 ### systemd
 
 ```bash

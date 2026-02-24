@@ -1,0 +1,14 @@
+.env
+.env.keys
+.git
+.coverage
+__pycache__
+*.pyc
+.venv
+.pytest_cache
+docs/
+tests/
+*.egg-info
+.claude/
+.claude-flow/
+.planning/
