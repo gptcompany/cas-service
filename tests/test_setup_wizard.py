@@ -297,6 +297,7 @@ class TestMatlabStep:
         mock_questionary.text.return_value.ask.return_value = "/opt/matlab/bin/matlab"
         step = self._make()
         with patch.dict("sys.modules", {"questionary": mock_questionary}), \
+             patch("cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None), \
              patch("cas_service.setup._matlab.os.path.isfile", return_value=True), \
              patch("cas_service.setup._matlab.os.access", return_value=True):
             assert step.install(_console()) is True
@@ -308,6 +309,7 @@ class TestMatlabStep:
         mock_questionary.text.return_value.ask.return_value = "/nope/matlab"
         step = self._make()
         with patch.dict("sys.modules", {"questionary": mock_questionary}), \
+             patch("cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None), \
              patch("cas_service.setup._matlab.os.path.isfile", return_value=False):
             assert step.install(_console()) is False
 
@@ -316,14 +318,16 @@ class TestMatlabStep:
         mock_questionary = MagicMock()
         mock_questionary.text.return_value.ask.return_value = ""
         step = self._make()
-        with patch.dict("sys.modules", {"questionary": mock_questionary}):
+        with patch.dict("sys.modules", {"questionary": mock_questionary}), \
+             patch("cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None):
             assert step.install(_console()) is False
 
     def test_install_questionary_unavailable(self):
         """install() returns False gracefully when questionary is not installed."""
         step = self._make()
         # Simulate questionary not being importable inside install()
-        with patch.dict("sys.modules", {"questionary": None}):
+        with patch.dict("sys.modules", {"questionary": None}), \
+             patch("cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None):
             # When module is None in sys.modules, import raises ImportError
             assert step.install(_console()) is False
 

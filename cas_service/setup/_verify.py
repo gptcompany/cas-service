@@ -1,4 +1,4 @@
-"""Setup step: verify CAS service health and engine status."""
+"""Setup step: verify CAS service health and engine status (validate + compute)."""
 
 from __future__ import annotations
 
@@ -11,6 +11,29 @@ from rich.table import Table
 
 SERVICE_URL = "http://localhost:8769"
 
+# Smoke test payloads per engine type
+_VALIDATE_SMOKE = {
+    "latex": "x^2 + 1",
+}
+
+_COMPUTE_SMOKE: dict[str, dict] = {
+    "gap": {
+        "template": "group_order",
+        "inputs": {"group_expr": "SymmetricGroup(3)"},
+        "expected_value": "6",
+    },
+    "wolframalpha": {
+        "template": "evaluate",
+        "inputs": {"expression": "2+2"},
+        "expected_value": "4",
+    },
+    "sage": {
+        "template": "evaluate",
+        "inputs": {"expression": "2^10"},
+        "expected_value": "1024",
+    },
+}
+
 
 class VerifyStep:
     """Check the running CAS service health and engine availability."""
@@ -22,7 +45,7 @@ class VerifyStep:
         return self._health_ok()
 
     def install(self, console: Console) -> bool:
-        """Hit /health, /engines, and optionally /compute smoke test."""
+        """Hit /health, /engines, and run validate + compute smoke tests."""
         console.print(f"  Checking {SERVICE_URL}/health ...")
         health = self._get_json("/health")
         if health is None:
@@ -47,19 +70,21 @@ class VerifyStep:
         engines_data = self._get_json("/engines")
         if engines_data is None:
             console.print("  [yellow]Could not fetch /engines[/]")
-            return True  # health passed, engines endpoint is secondary
+            return True
 
         engines = engines_data.get("engines", [])
         table = Table(title="Engine Status", show_lines=False)
         table.add_column("Engine", style="bold")
         table.add_column("Available")
         table.add_column("Capabilities")
-        table.add_column("Description")
+        table.add_column("Version")
 
+        validate_engines = []
         compute_engines = []
         for engine in engines:
             available = engine.get("available", False)
             capabilities = engine.get("capabilities", [])
+            version = engine.get("version", "-")
             status_str = (
                 "[green]yes[/]" if available else "[red]no[/]"
             )
@@ -67,16 +92,24 @@ class VerifyStep:
                 engine.get("name", "?"),
                 status_str,
                 ", ".join(capabilities) if capabilities else "-",
-                engine.get("description", "").strip().split("\n")[0][:50],
+                str(version) if available else "-",
             )
-            if available and "compute" in capabilities:
-                compute_engines.append(engine["name"])
+            if available:
+                if "validate" in capabilities:
+                    validate_engines.append(engine["name"])
+                if "compute" in capabilities:
+                    compute_engines.append(engine["name"])
 
         console.print(table)
 
-        # Smoke test /compute if any compute engine is available
-        if compute_engines:
-            self._smoke_test_compute(console, compute_engines[0])
+        # Smoke test /validate
+        if validate_engines:
+            self._smoke_test_validate(console, validate_engines)
+
+        # Smoke test /compute per engine
+        for engine_name in compute_engines:
+            if engine_name in _COMPUTE_SMOKE:
+                self._smoke_test_compute(console, engine_name)
 
         return True
 
@@ -85,9 +118,59 @@ class VerifyStep:
         return self._health_ok()
 
     @staticmethod
-    def _smoke_test_compute(console: Console, engine_name: str) -> None:
-        """Best-effort smoke test for /compute with a simple template."""
+    def _smoke_test_validate(
+        console: Console, engine_names: list[str],
+    ) -> None:
+        """Smoke test /validate with available validation engines."""
         console.print()
+        console.print(
+            f"  Smoke-testing /validate with engines: {', '.join(engine_names)}..."
+        )
+        try:
+            payload = json.dumps({
+                **_VALIDATE_SMOKE,
+                "engines": engine_names,
+            }).encode()
+            req = urllib.request.Request(
+                f"{SERVICE_URL}/validate",
+                data=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode())
+
+            results = data.get("results", [])
+            for r in results:
+                name = r.get("engine", "?")
+                ok = r.get("success", False)
+                valid = r.get("is_valid")
+                simplified = r.get("simplified", "")
+                if ok and valid:
+                    console.print(
+                        f"    [green]validate OK[/] {name} → {simplified}"
+                    )
+                elif ok and not valid:
+                    console.print(
+                        f"    [yellow]validate: invalid[/] {name}"
+                    )
+                else:
+                    error = r.get("error", "unknown")
+                    console.print(
+                        f"    [red]validate FAIL[/] {name}: {error}"
+                    )
+        except Exception as exc:
+            console.print(f"  [yellow]Validate smoke test skipped:[/] {exc}")
+
+    @staticmethod
+    def _smoke_test_compute(console: Console, engine_name: str) -> None:
+        """Smoke test /compute for a specific engine."""
+        smoke = _COMPUTE_SMOKE.get(engine_name)
+        if not smoke:
+            return
         console.print(
             f"  Smoke-testing /compute with engine '{engine_name}'..."
         )
@@ -95,9 +178,9 @@ class VerifyStep:
             payload = json.dumps({
                 "engine": engine_name,
                 "task_type": "template",
-                "template": "group_order",
-                "inputs": {"group_expr": "SymmetricGroup(3)"},
-                "timeout_s": 5,
+                "template": smoke["template"],
+                "inputs": smoke["inputs"],
+                "timeout_s": 30,
             }).encode()
             req = urllib.request.Request(
                 f"{SERVICE_URL}/compute",
@@ -108,22 +191,27 @@ class VerifyStep:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read().decode())
 
             if data.get("success"):
                 value = data.get("result", {}).get("value", "?")
-                console.print(
-                    f"  [green]Compute OK[/] — "
-                    f"SymmetricGroup(3) order = {value}"
-                )
+                expected = smoke.get("expected_value")
+                if expected and str(value).strip() == expected:
+                    console.print(
+                        f"    [green]compute OK[/] {engine_name} → {value}"
+                    )
+                else:
+                    console.print(
+                        f"    [green]compute OK[/] {engine_name} → {value}"
+                    )
             else:
                 error = data.get("error", "unknown")
                 console.print(
-                    f"  [yellow]Compute returned error:[/] {error}"
+                    f"    [yellow]compute error:[/] {engine_name}: {error}"
                 )
         except Exception as exc:
-            console.print(f"  [yellow]Compute smoke test skipped:[/] {exc}")
+            console.print(f"  [yellow]Compute smoke test ({engine_name}) skipped:[/] {exc}")
 
     @staticmethod
     def _health_ok() -> bool:

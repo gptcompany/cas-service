@@ -2,7 +2,8 @@
 
 Usage:
     cas-setup            # Run all setup steps
-    cas-setup engines    # Check engines only (Maxima, MATLAB, SymPy)
+    cas-setup engines    # Check engines only
+    cas-setup configure  # Re-configure engine paths and API keys
     cas-setup service    # Configure service deployment
     cas-setup verify     # Verify running service health + engines
 """
@@ -75,6 +76,23 @@ def _service_steps() -> list:
     return [ServiceStep()]
 
 
+def _configure_steps() -> list:
+    """Return engine configuration steps (path prompts, API keys)."""
+    from cas_service.setup._gap import GapStep
+    from cas_service.setup._maxima import MaximaStep
+    from cas_service.setup._matlab import MatlabStep
+    from cas_service.setup._sage import SageStep
+    from cas_service.setup._wolframalpha import WolframAlphaStep
+
+    return [
+        MaximaStep(),
+        GapStep(),
+        MatlabStep(),
+        SageStep(),
+        WolframAlphaStep(),
+    ]
+
+
 def _verify_steps() -> list:
     """Return verification step only."""
     from cas_service.setup._verify import VerifyStep
@@ -84,8 +102,9 @@ def _verify_steps() -> list:
 
 SUBCOMMANDS = {
     "engines": (_engine_steps, "Check CAS engines (SymPy, Maxima, GAP, MATLAB, Sage, WA)"),
+    "configure": (_configure_steps, "Re-configure engine paths and API keys"),
     "service": (_service_steps, "Configure service deployment"),
-    "verify": (_verify_steps, "Verify running service health"),
+    "verify": (_verify_steps, "Verify running service health + engine smoke tests"),
 }
 
 
