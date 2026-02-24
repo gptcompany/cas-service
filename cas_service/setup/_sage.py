@@ -2,18 +2,23 @@
 
 from __future__ import annotations
 
+import glob
+import os
 import shutil
 import subprocess
 
 from rich.console import Console
 
-from cas_service.setup._config import get_key, write_key
+from cas_service.setup._config import env_path, get_key, write_key
 
-# Common SageMath binary locations
+# Common SageMath binary locations (Linux + macOS)
 _SEARCH_PATHS = [
     "/usr/bin/sage",
     "/usr/local/bin/sage",
     "/opt/sage/sage",
+    "/opt/homebrew/bin/sage",
+    "/Applications/SageMath/sage",
+    "/Applications/SageMath-*/sage",
 ]
 
 
@@ -51,7 +56,7 @@ class SageStep:
             console.print(f"  Saved CAS_SAGE_PATH={path} to .env")
             return True
 
-        # Offer auto-install on Debian/Ubuntu
+        # Offer auto-install: apt on Linux, brew on macOS
         if shutil.which("apt-get"):
             console.print("  SageMath not found. Attempting auto-install via apt...")
             console.print("  [dim](This may take a few minutes — ~2GB download)[/]")
@@ -71,6 +76,28 @@ class SageStep:
                         return True
                 console.print(
                     f"  [red]apt install failed:[/] {result.stderr[:200]}"
+                )
+            except Exception as exc:
+                console.print(f"  [red]Auto-install failed: {exc}[/]")
+        elif shutil.which("brew"):
+            console.print("  SageMath not found. Attempting auto-install via brew...")
+            console.print("  [dim](This may take a while — large download)[/]")
+            try:
+                result = subprocess.run(
+                    ["brew", "install", "--cask", "sage"],
+                    capture_output=True,
+                    text=True,
+                    timeout=600,
+                )
+                if result.returncode == 0:
+                    path = shutil.which("sage") or self._find_sage()
+                    if path:
+                        self._found_path = path
+                        write_key("CAS_SAGE_PATH", path)
+                        console.print(f"  [green]SageMath installed at {path}[/]")
+                        return True
+                console.print(
+                    f"  [red]brew install failed:[/] {result.stderr[:200]}"
                 )
             except Exception as exc:
                 console.print(f"  [red]Auto-install failed: {exc}[/]")
@@ -95,7 +122,7 @@ class SageStep:
 
         console.print("  [yellow]SageMath not configured — skipping.[/]")
         console.print("  Install: https://doc.sagemath.org/html/en/installation/")
-        console.print("  Set CAS_SAGE_PATH when ready.")
+        console.print(f"  Then set CAS_SAGE_PATH in: [bold]{env_path()}[/]")
         return False
 
     def verify(self) -> bool:
@@ -123,10 +150,14 @@ class SageStep:
         path = shutil.which("sage")
         if path:
             return path
-        # Check common locations
-        import os
+        # Check common locations (supports glob patterns)
         for p in _SEARCH_PATHS:
-            if os.path.isfile(p) and os.access(p, os.X_OK):
+            if "*" in p:
+                matches = sorted(glob.glob(p), reverse=True)
+                for match in matches:
+                    if os.path.isfile(match) and os.access(match, os.X_OK):
+                        return match
+            elif os.path.isfile(p) and os.access(p, os.X_OK):
                 return p
         return None
 
