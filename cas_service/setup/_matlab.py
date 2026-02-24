@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import glob
 import os
+import shutil
 
 from rich.console import Console
 
@@ -17,6 +18,8 @@ _SEARCH_PATHS = [
     os.path.expanduser("~/MATLAB/*/bin/matlab"),
     "/media/*/matlab*/bin/matlab",
     "/media/*/*/matlab*/bin/matlab",
+    "/media/*/apps/matlab*/bin/matlab",
+    "/media/*/*/apps/matlab*/bin/matlab",
     "/media/*/MATLAB/*/bin/matlab",
     "/media/*/*/MATLAB/*/bin/matlab",
     "/Volumes/*/MATLAB*/bin/matlab",
@@ -34,8 +37,9 @@ class MatlabStep:
     def check(self) -> bool:
         """Return True if a MATLAB binary is configured or found."""
         configured = get_key("CAS_MATLAB_PATH")
-        if configured and os.path.isfile(configured) and os.access(configured, os.X_OK):
-            self._found_path = configured
+        configured_path = self._resolve_executable(configured)
+        if configured_path:
+            self._found_path = configured_path
             return True
         self._found_path = self._find_matlab()
         return self._found_path is not None
@@ -67,10 +71,11 @@ class MatlabStep:
                 "Enter MATLAB binary path (or press Enter to skip):",
                 default="",
             ).ask()
-            if custom and os.path.isfile(custom) and os.access(custom, os.X_OK):
-                self._found_path = custom
-                write_key("CAS_MATLAB_PATH", custom)
-                console.print(f"  [green]Saved CAS_MATLAB_PATH={custom}[/]")
+            resolved = self._resolve_executable(custom)
+            if custom and resolved:
+                self._found_path = resolved
+                write_key("CAS_MATLAB_PATH", resolved)
+                console.print(f"  [green]Saved CAS_MATLAB_PATH={resolved}[/]")
                 return True
             if custom:
                 console.print(
@@ -85,24 +90,37 @@ class MatlabStep:
 
     def verify(self) -> bool:
         """Verify the found MATLAB binary is executable."""
-        if self._found_path and os.path.isfile(self._found_path):
-            return os.access(self._found_path, os.X_OK)
-        return False
+        return self._resolve_executable(self._found_path) is not None
 
     @staticmethod
     def _find_matlab() -> str | None:
         """Search common paths for the MATLAB binary."""
         # Check configured path first
-        configured = get_key("CAS_MATLAB_PATH")
-        if configured and os.path.isfile(configured) and os.access(configured, os.X_OK):
+        configured = MatlabStep._resolve_executable(get_key("CAS_MATLAB_PATH"))
+        if configured:
             return configured
+        # Check PATH (important when CAS_MATLAB_PATH is unset and binary is symlinked)
+        in_path = shutil.which("matlab")
+        if in_path:
+            return in_path
         for pattern in _SEARCH_PATHS:
             if "*" in pattern:
                 matches = sorted(glob.glob(pattern), reverse=True)
                 for match in matches:
-                    if os.path.isfile(match) and os.access(match, os.X_OK):
-                        return match
+                    resolved = MatlabStep._resolve_executable(match)
+                    if resolved:
+                        return resolved
             else:
-                if os.path.isfile(pattern) and os.access(pattern, os.X_OK):
-                    return pattern
+                resolved = MatlabStep._resolve_executable(pattern)
+                if resolved:
+                    return resolved
         return None
+
+    @staticmethod
+    def _resolve_executable(candidate: str | None) -> str | None:
+        """Resolve a MATLAB executable from absolute path or command name."""
+        if not candidate:
+            return None
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+        return shutil.which(candidate)

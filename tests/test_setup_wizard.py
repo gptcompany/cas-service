@@ -169,6 +169,22 @@ class TestMatlabStep:
         assert step.check() is True
         assert step._found_path is not None
 
+    @patch("cas_service.setup._matlab.shutil.which", return_value="/usr/bin/matlab")
+    @patch("cas_service.setup._matlab.get_key", return_value="matlab")
+    def test_check_with_configured_command_name(self, mock_get_key, mock_which):
+        """check() accepts CAS_MATLAB_PATH as command name when on PATH."""
+        step = self._make()
+        assert step.check() is True
+        assert step._found_path == "/usr/bin/matlab"
+
+    @patch("cas_service.setup._matlab.shutil.which", return_value="/usr/bin/matlab")
+    @patch("cas_service.setup._matlab.get_key", return_value=None)
+    def test_check_found_on_path(self, mock_get_key, mock_which):
+        """check() detects MATLAB from PATH even when no config is set."""
+        step = self._make()
+        assert step.check() is True
+        assert step._found_path == "/usr/bin/matlab"
+
     @patch("cas_service.setup._matlab.os.access", return_value=False)
     @patch("cas_service.setup._matlab.os.path.isfile", return_value=False)
     @patch("cas_service.setup._matlab.glob.glob", return_value=[])
@@ -204,6 +220,23 @@ class TestMatlabStep:
         ):
             assert step.install(_console()) is True
             assert step._found_path == "/opt/matlab/bin/matlab"
+
+    def test_install_custom_command_name_valid(self):
+        """install() accepts a MATLAB command name available on PATH."""
+        mock_questionary = MagicMock()
+        mock_questionary.text.return_value.ask.return_value = "matlab"
+        step = self._make()
+        with (
+            patch.dict("sys.modules", {"questionary": mock_questionary}),
+            patch(
+                "cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None
+            ),
+            patch(
+                "cas_service.setup._matlab.shutil.which", return_value="/usr/bin/matlab"
+            ),
+        ):
+            assert step.install(_console()) is True
+            assert step._found_path == "/usr/bin/matlab"
 
     def test_install_custom_path_invalid(self):
         """install() returns False for invalid custom path."""
@@ -272,6 +305,13 @@ class TestMatlabStep:
             patch("cas_service.setup._matlab.os.access", return_value=False),
         ):
             assert step.verify() is False
+
+    @patch("cas_service.setup._matlab.shutil.which", return_value="/usr/bin/matlab")
+    def test_verify_command_name_on_path(self, mock_which):
+        """verify() accepts command names, not only absolute paths."""
+        step = self._make()
+        step._found_path = "matlab"
+        assert step.verify() is True
 
 
 # ===========================================================================
