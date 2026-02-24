@@ -64,18 +64,18 @@ _FONT_COMMANDS = [
 
 # Phase 3: Synonym mapping
 _SYNONYMS = {
-    r"\\dfrac": r"\\frac",
-    r"\\tfrac": r"\\frac",
-    r"\\ge": r"\\geq",
-    r"\\le": r"\\leq",
-    r"\\ne": r"\\neq",
-    r"\\to": r"\\rightarrow",
-    r"\\gets": r"\\leftarrow",
-    r"\\land": r"\\wedge",
-    r"\\lor": r"\\vee",
-    r"\\lnot": r"\\neg",
-    r"\\cdot": "*",
-    r"\\times": "*",
+    r"\dfrac": r"\frac",
+    r"\tfrac": r"\frac",
+    r"\ge": r"\geq",
+    r"\le": r"\leq",
+    r"\ne": r"\neq",
+    r"\to": r"\rightarrow",
+    r"\gets": r"\leftarrow",
+    r"\land": r"\wedge",
+    r"\lor": r"\vee",
+    r"\lnot": r"\neg",
+    r"\cdot": "*",
+    r"\times": "*",
 }
 
 
@@ -109,9 +109,23 @@ def clean_whitespace(latex: str) -> str:
     """Phase 4: Collapse whitespace and remove redundant outer braces."""
     result = re.sub(r"\s+", " ", latex).strip()
     if result.startswith("{") and result.endswith("}"):
-        inner = result[1:-1]
-        if inner.count("{") == inner.count("}"):
-            result = inner
+        # Strip a single redundant outer brace pair only when it wraps the
+        # entire string (e.g. "{x+1}" -> "x+1", but "{x}+{y}" stays unchanged).
+        level = 0
+        balanced = True
+        for i, char in enumerate(result[:-1]):
+            if char == "{":
+                level += 1
+            elif char == "}":
+                level -= 1
+            if level < 0:
+                balanced = False
+                break
+            if i > 0 and level == 0:
+                balanced = False
+                break
+        if balanced and level == 1:
+            result = result[1:-1]
     return result
 
 

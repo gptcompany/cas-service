@@ -114,7 +114,8 @@ class WolframAlphaEngine(BaseEngine):
                 "output": "json",
             }
         )
-        url = f"{_WA_API_URL}?{params}"
+        api_url = os.environ.get("CAS_WOLFRAMALPHA_API_URL", _WA_API_URL)
+        url = f"{api_url}?{params}"
 
         try:
             req = urllib.request.Request(url, method="GET")

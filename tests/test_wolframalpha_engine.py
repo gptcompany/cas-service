@@ -280,6 +280,35 @@ class TestWAAPICall:
         assert result.success is True
         assert "3.14159" in result.result["value"]
 
+    @patch("cas_service.engines.wolframalpha_engine.urllib.request.urlopen")
+    def test_uses_api_url_override_from_env(self, mock_urlopen, monkeypatch):
+        monkeypatch.setenv(
+            "CAS_WOLFRAMALPHA_API_URL",
+            "http://wa-proxy.local/v2/query",
+        )
+        mock_urlopen.return_value = self._mock_response(
+            {
+                "queryresult": {
+                    "success": True,
+                    "pods": [
+                        {"id": "Input", "subpods": [{"plaintext": "2 + 2"}]},
+                        {"id": "Result", "subpods": [{"plaintext": "4"}]},
+                    ],
+                },
+            }
+        )
+        engine = WolframAlphaEngine(app_id="FAKE")
+        req = ComputeRequest(
+            engine="wolframalpha",
+            task_type="template",
+            template="evaluate",
+            inputs={"expression": "2+2"},
+        )
+        result = engine.compute(req)
+        assert result.success is True
+        called_req = mock_urlopen.call_args.args[0]
+        assert called_req.full_url.startswith("http://wa-proxy.local/v2/query?")
+
 
 # ---------------------------------------------------------------------------
 # Integration tests — via HTTP server
