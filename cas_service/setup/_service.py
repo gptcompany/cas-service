@@ -60,8 +60,7 @@ class ServiceStep:
         if len(choices) == 1:
             # Only foreground available
             console.print(
-                "  [dim]systemd and Docker not available "
-                "— using foreground mode.[/]"
+                "  [dim]systemd and Docker not available — using foreground mode.[/]"
             )
             self._mode = "foreground"
             return self._show_foreground(console)
@@ -178,8 +177,15 @@ class ServiceStep:
         if has_dotenvx and has_env:
             console.print("  Starting with dotenvx (decrypted .env)...")
             cmd = [
-                "dotenvx", "run", "-f", env_file, "--",
-                "docker", "compose", "up", "-d",
+                "dotenvx",
+                "run",
+                "-f",
+                env_file,
+                "--",
+                "docker",
+                "compose",
+                "up",
+                "-d",
             ]
         else:
             if has_env and not has_dotenvx:
@@ -187,9 +193,7 @@ class ServiceStep:
                     "  [yellow]dotenvx not found — .env won't be decrypted "
                     "automatically.[/]"
                 )
-                console.print(
-                    "  [dim]Install dotenvx or pass env vars manually.[/]"
-                )
+                console.print("  [dim]Install dotenvx or pass env vars manually.[/]")
             console.print("  Starting container...")
             cmd = ["docker", "compose", "up", "-d"]
 
@@ -235,7 +239,9 @@ class ServiceStep:
         console.print("  Environment variables (optional):")
         console.print("    CAS_PORT=8769")
         console.print("    CAS_SAGE_PATH=sage")
-        console.print("    CAS_WOLFRAMALPHA_APPID=<your-appid>  # optional remote engine")
+        console.print(
+            "    CAS_WOLFRAMALPHA_APPID=<your-appid>  # optional remote engine"
+        )
         console.print("    CAS_LOG_LEVEL=INFO")
         console.print()
         return True

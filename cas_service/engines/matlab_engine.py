@@ -25,8 +25,10 @@ logger = logging.getLogger(__name__)
 # LaTeX → MATLAB syntax conversion table
 _LATEX_TO_MATLAB = [
     # Fractions: \frac{a}{b} → (a)/(b)
-    (r"\\frac\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}",
-     r"(\1)/(\2)"),
+    (
+        r"\\frac\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}",
+        r"(\1)/(\2)",
+    ),
     # Square root: \sqrt{x} → sqrt(x)
     (r"\\sqrt\{([^{}]*)\}", r"sqrt(\1)"),
     # Nth root: \sqrt[n]{x} → (x)^(1/(n))
@@ -76,10 +78,10 @@ _LATEX_TO_MATLAB = [
 
 # Implicit multiplication patterns
 _IMPLICIT_MULT = [
-    (r"(\d)([a-zA-Z])", r"\1*\2"),      # 2x → 2*x
-    (r"([a-zA-Z])(\d)", r"\1*\2"),      # x2 → x*2
-    (r"\)([a-zA-Z])", r")*\1"),          # )x → )*x
-    (r"([a-zA-Z])\(", r"\1*("),          # x( → x*(
+    (r"(\d)([a-zA-Z])", r"\1*\2"),  # 2x → 2*x
+    (r"([a-zA-Z])(\d)", r"\1*\2"),  # x2 → x*2
+    (r"\)([a-zA-Z])", r")*\1"),  # )x → )*x
+    (r"([a-zA-Z])\(", r"\1*("),  # x( → x*(
 ]
 
 
@@ -113,9 +115,14 @@ def _validate_input(value: str) -> bool:
         return False
     if _BLOCKED_PATTERNS.search(value):
         return False
-    if "\x00" in value:
+    if any(ch in value for ch in ("\x00", "\n", "\r")):
         return False
     return True
+
+
+def _matlab_single_quoted(value: str) -> str:
+    """Return a MATLAB single-quoted string literal with embedded quotes escaped."""
+    return "'" + value.replace("'", "''") + "'"
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +169,8 @@ class MatlabEngine(BaseEngine):
             matlab_expr = _latex_to_matlab(latex)
             if not matlab_expr:
                 return EngineResult(
-                    engine=self.name, success=False,
+                    engine=self.name,
+                    success=False,
                     error="empty expression after conversion",
                     time_ms=int((time.time() - start) * 1000),
                 )
@@ -225,26 +233,34 @@ class MatlabEngine(BaseEngine):
         except subprocess.TimeoutExpired:
             elapsed = int((time.time() - start) * 1000)
             return EngineResult(
-                engine=self.name, success=False,
-                error=f"timeout ({self.timeout}s)", time_ms=elapsed,
+                engine=self.name,
+                success=False,
+                error=f"timeout ({self.timeout}s)",
+                time_ms=elapsed,
             )
         except FileNotFoundError:
             elapsed = int((time.time() - start) * 1000)
             return EngineResult(
-                engine=self.name, success=False,
-                error="MATLAB binary not found", time_ms=elapsed,
+                engine=self.name,
+                success=False,
+                error="MATLAB binary not found",
+                time_ms=elapsed,
             )
         except Exception as e:
             elapsed = int((time.time() - start) * 1000)
             return EngineResult(
-                engine=self.name, success=False,
-                error=f"matlab error: {e}", time_ms=elapsed,
+                engine=self.name,
+                success=False,
+                error=f"matlab error: {e}",
+                time_ms=elapsed,
             )
 
     def _run_matlab(self, code: str) -> str:
         """Execute MATLAB code via temp file and return stdout."""
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".m", delete=False,
+            mode="w",
+            suffix=".m",
+            delete=False,
         ) as f:
             f.write(code)
             temp_script = f.name
@@ -253,7 +269,9 @@ class MatlabEngine(BaseEngine):
             run_cmd = f"run('{temp_script}')"
             result = subprocess.run(
                 [self.matlab_path, "-batch", run_cmd],
-                capture_output=True, text=True, timeout=self.timeout,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
             )
             if result.returncode != 0 and not result.stdout.strip():
                 stderr = result.stderr.strip()
@@ -270,7 +288,9 @@ class MatlabEngine(BaseEngine):
 
     def is_available(self) -> bool:
         if os.path.isabs(self.matlab_path):
-            return os.path.isfile(self.matlab_path) and os.access(self.matlab_path, os.X_OK)
+            return os.path.isfile(self.matlab_path) and os.access(
+                self.matlab_path, os.X_OK
+            )
         return shutil.which(self.matlab_path) is not None
 
     # -- compute -----------------------------------------------------------
@@ -298,9 +318,7 @@ class MatlabEngine(BaseEngine):
             )
 
         # Check required inputs
-        missing = [
-            k for k in tmpl["required_inputs"] if k not in request.inputs
-        ]
+        missing = [k for k in tmpl["required_inputs"] if k not in request.inputs]
         if missing:
             return ComputeResult(
                 engine=self.name,
@@ -330,7 +348,8 @@ class MatlabEngine(BaseEngine):
         except subprocess.TimeoutExpired:
             elapsed = int((time.time() - start) * 1000)
             return ComputeResult(
-                engine=self.name, success=False,
+                engine=self.name,
+                success=False,
                 error=f"MATLAB timed out after {self.timeout}s",
                 error_code="TIMEOUT",
                 time_ms=elapsed,
@@ -338,7 +357,8 @@ class MatlabEngine(BaseEngine):
         except Exception as e:
             elapsed = int((time.time() - start) * 1000)
             return ComputeResult(
-                engine=self.name, success=False,
+                engine=self.name,
+                success=False,
                 error=f"MATLAB error: {e}",
                 error_code="ENGINE_ERROR",
                 time_ms=elapsed,
@@ -350,9 +370,11 @@ class MatlabEngine(BaseEngine):
 
         if template == "evaluate":
             expr = inputs["expression"]
+            expr_literal = _matlab_single_quoted(expr)
             return (
                 header
-                + f"result = eval('{expr}');\n"
+                + f"expr = {expr_literal};\n"
+                + "result = eval(expr);\n"
                 + "disp(['MATLAB_RESULT:', char(string(result))]);\n"
             )
         elif template == "simplify":
@@ -388,7 +410,7 @@ class MatlabEngine(BaseEngine):
         for line in output.split("\n"):
             line = line.strip()
             if line.startswith("MATLAB_RESULT:"):
-                value = line[len("MATLAB_RESULT:"):].strip()
+                value = line[len("MATLAB_RESULT:") :].strip()
                 return ComputeResult(
                     engine=self.name,
                     success=True,
@@ -397,7 +419,7 @@ class MatlabEngine(BaseEngine):
                     stdout=output,
                 )
             elif line.startswith("MATLAB_ERROR:"):
-                error_msg = line[len("MATLAB_ERROR:"):].strip()
+                error_msg = line[len("MATLAB_ERROR:") :].strip()
                 return ComputeResult(
                     engine=self.name,
                     success=False,
@@ -422,7 +444,9 @@ class MatlabEngine(BaseEngine):
         try:
             result = subprocess.run(
                 [self.matlab_path, "-batch", "disp(version)"],
-                capture_output=True, text=True, timeout=15,
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             for line in result.stdout.strip().split("\n"):
                 line = line.strip()

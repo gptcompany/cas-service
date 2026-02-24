@@ -45,14 +45,11 @@ class VerifyStep:
         health = self._get_json("/health")
         if health is None:
             console.print(
-                f"  [red]Cannot reach {SERVICE_URL}[/] — "
-                "is the service running?"
+                f"  [red]Cannot reach {SERVICE_URL}[/] — is the service running?"
             )
             console.print()
             console.print("  Start it with:")
-            console.print(
-                "    uv run python -m cas_service.main"
-            )
+            console.print("    uv run python -m cas_service.main")
             console.print("  Or:")
             console.print("    sudo systemctl start cas-service")
             return False
@@ -80,9 +77,7 @@ class VerifyStep:
             available = engine.get("available", False)
             capabilities = engine.get("capabilities", [])
             version = engine.get("version", "-")
-            status_str = (
-                "[green]yes[/]" if available else "[red]no[/]"
-            )
+            status_str = "[green]yes[/]" if available else "[red]no[/]"
             table.add_row(
                 engine.get("name", "?"),
                 status_str,
@@ -114,7 +109,8 @@ class VerifyStep:
 
     @staticmethod
     def _smoke_test_validate(
-        console: Console, engine_names: list[str],
+        console: Console,
+        engine_names: list[str],
     ) -> None:
         """Smoke test /validate with available validation engines."""
         console.print()
@@ -122,10 +118,12 @@ class VerifyStep:
             f"  Smoke-testing /validate with engines: {', '.join(engine_names)}..."
         )
         try:
-            payload = json.dumps({
-                **_VALIDATE_SMOKE,
-                "engines": engine_names,
-            }).encode()
+            payload = json.dumps(
+                {
+                    **_VALIDATE_SMOKE,
+                    "engines": engine_names,
+                }
+            ).encode()
             req = urllib.request.Request(
                 f"{SERVICE_URL}/validate",
                 data=payload,
@@ -145,18 +143,12 @@ class VerifyStep:
                 valid = r.get("is_valid")
                 simplified = r.get("simplified", "")
                 if ok and valid:
-                    console.print(
-                        f"    [green]validate OK[/] {name} → {simplified}"
-                    )
+                    console.print(f"    [green]validate OK[/] {name} → {simplified}")
                 elif ok and not valid:
-                    console.print(
-                        f"    [yellow]validate: invalid[/] {name}"
-                    )
+                    console.print(f"    [yellow]validate: invalid[/] {name}")
                 else:
                     error = r.get("error", "unknown")
-                    console.print(
-                        f"    [red]validate FAIL[/] {name}: {error}"
-                    )
+                    console.print(f"    [red]validate FAIL[/] {name}: {error}")
         except Exception as exc:
             console.print(f"  [yellow]Validate smoke test skipped:[/] {exc}")
 
@@ -166,17 +158,17 @@ class VerifyStep:
         smoke = _COMPUTE_SMOKE.get(engine_name)
         if not smoke:
             return
-        console.print(
-            f"  Smoke-testing /compute with engine '{engine_name}'..."
-        )
+        console.print(f"  Smoke-testing /compute with engine '{engine_name}'...")
         try:
-            payload = json.dumps({
-                "engine": engine_name,
-                "task_type": "template",
-                "template": smoke["template"],
-                "inputs": smoke["inputs"],
-                "timeout_s": 30,
-            }).encode()
+            payload = json.dumps(
+                {
+                    "engine": engine_name,
+                    "task_type": "template",
+                    "template": smoke["template"],
+                    "inputs": smoke["inputs"],
+                    "timeout_s": 30,
+                }
+            ).encode()
             req = urllib.request.Request(
                 f"{SERVICE_URL}/compute",
                 data=payload,
@@ -193,20 +185,16 @@ class VerifyStep:
                 value = data.get("result", {}).get("value", "?")
                 expected = smoke.get("expected_value")
                 if expected and str(value).strip() == expected:
-                    console.print(
-                        f"    [green]compute OK[/] {engine_name} → {value}"
-                    )
+                    console.print(f"    [green]compute OK[/] {engine_name} → {value}")
                 else:
-                    console.print(
-                        f"    [green]compute OK[/] {engine_name} → {value}"
-                    )
+                    console.print(f"    [green]compute OK[/] {engine_name} → {value}")
             else:
                 error = data.get("error", "unknown")
-                console.print(
-                    f"    [yellow]compute error:[/] {engine_name}: {error}"
-                )
+                console.print(f"    [yellow]compute error:[/] {engine_name}: {error}")
         except Exception as exc:
-            console.print(f"  [yellow]Compute smoke test ({engine_name}) skipped:[/] {exc}")
+            console.print(
+                f"  [yellow]Compute smoke test ({engine_name}) skipped:[/] {exc}"
+            )
 
     @staticmethod
     def _health_ok() -> bool:

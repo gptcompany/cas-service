@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import io
 import json
 from http.server import HTTPServer
 from threading import Thread
-from unittest.mock import patch
 
 import pytest
 
@@ -90,7 +88,8 @@ def _post(addr, path, body):
 
     conn = http.client.HTTPConnection(addr[0], addr[1], timeout=5)
     conn.request(
-        "POST", path,
+        "POST",
+        path,
         body=json.dumps(body),
         headers={"Content-Type": "application/json"},
     )
@@ -120,7 +119,6 @@ def _get(addr, path):
 
 
 class TestEnginesCapabilities:
-
     def test_engines_includes_capabilities(self, cas_server):
         status, data = _get(cas_server, "/engines")
         assert status == 200
@@ -131,7 +129,8 @@ class TestEnginesCapabilities:
 
         assert "test_compute" in engines
         assert set(engines["test_compute"]["capabilities"]) == {
-            "validate", "compute",
+            "validate",
+            "compute",
         }
 
     def test_engines_available_field(self, cas_server):
@@ -147,63 +146,91 @@ class TestEnginesCapabilities:
 
 
 class TestComputeValidation:
-
     def test_missing_engine(self, cas_server):
-        status, data = _post(cas_server, "/compute", {
-            "task_type": "template", "template": "echo",
-        })
+        status, data = _post(
+            cas_server,
+            "/compute",
+            {
+                "task_type": "template",
+                "template": "echo",
+            },
+        )
         assert status == 400
         assert data["code"] == "INVALID_REQUEST"
 
     def test_unknown_engine(self, cas_server):
-        status, data = _post(cas_server, "/compute", {
-            "engine": "nonexistent",
-            "task_type": "template",
-            "template": "echo",
-        })
+        status, data = _post(
+            cas_server,
+            "/compute",
+            {
+                "engine": "nonexistent",
+                "task_type": "template",
+                "template": "echo",
+            },
+        )
         assert status == 422
         assert data["code"] == "UNKNOWN_ENGINE"
         assert "available" in data["details"]
 
     def test_missing_task_type(self, cas_server):
-        status, data = _post(cas_server, "/compute", {
-            "engine": "test_compute",
-            "template": "echo",
-        })
+        status, data = _post(
+            cas_server,
+            "/compute",
+            {
+                "engine": "test_compute",
+                "template": "echo",
+            },
+        )
         assert status == 400
         assert data["code"] == "INVALID_REQUEST"
 
     def test_invalid_task_type(self, cas_server):
-        status, data = _post(cas_server, "/compute", {
-            "engine": "test_compute",
-            "task_type": "script",
-            "template": "echo",
-        })
+        status, data = _post(
+            cas_server,
+            "/compute",
+            {
+                "engine": "test_compute",
+                "task_type": "script",
+                "template": "echo",
+            },
+        )
         assert status == 400
 
     def test_missing_template(self, cas_server):
-        status, data = _post(cas_server, "/compute", {
-            "engine": "test_compute",
-            "task_type": "template",
-        })
+        status, data = _post(
+            cas_server,
+            "/compute",
+            {
+                "engine": "test_compute",
+                "task_type": "template",
+            },
+        )
         assert status == 400
 
     def test_invalid_inputs_type(self, cas_server):
-        status, data = _post(cas_server, "/compute", {
-            "engine": "test_compute",
-            "task_type": "template",
-            "template": "echo",
-            "inputs": "not_a_dict",
-        })
+        status, data = _post(
+            cas_server,
+            "/compute",
+            {
+                "engine": "test_compute",
+                "task_type": "template",
+                "template": "echo",
+                "inputs": "not_a_dict",
+            },
+        )
         assert status == 400
 
     def test_invalid_timeout(self, cas_server):
-        status, data = _post(cas_server, "/compute", {
-            "engine": "test_compute",
-            "task_type": "template",
-            "template": "echo",
-            "timeout_s": -1,
-        })
+        status, data = _post(
+            cas_server,
+            "/compute",
+            {
+                "engine": "test_compute",
+                "task_type": "template",
+                "template": "echo",
+                "timeout_s": -1,
+            },
+        )
         assert status == 400
 
     def test_empty_body(self, cas_server):
@@ -211,9 +238,15 @@ class TestComputeValidation:
         import http.client
 
         conn = http.client.HTTPConnection(cas_server[0], cas_server[1], timeout=5)
-        conn.request("POST", "/compute", body=b"", headers={
-            "Content-Type": "application/json", "Content-Length": "0",
-        })
+        conn.request(
+            "POST",
+            "/compute",
+            body=b"",
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": "0",
+            },
+        )
         resp = conn.getresponse()
         data = json.loads(resp.read())
         conn.close()
@@ -226,25 +259,32 @@ class TestComputeValidation:
 
 
 class TestComputeCapability:
-
     def test_compute_on_validate_only_engine(self, cas_server):
         """Engine without compute capability returns NOT_IMPLEMENTED."""
-        status, data = _post(cas_server, "/compute", {
-            "engine": "test_validate",
-            "task_type": "template",
-            "template": "echo",
-        })
+        status, data = _post(
+            cas_server,
+            "/compute",
+            {
+                "engine": "test_validate",
+                "task_type": "template",
+                "template": "echo",
+            },
+        )
         assert status == 400
         assert data["code"] == "NOT_IMPLEMENTED"
 
     def test_compute_success(self, cas_server):
         """Compute-capable engine returns valid result."""
-        status, data = _post(cas_server, "/compute", {
-            "engine": "test_compute",
-            "task_type": "template",
-            "template": "echo",
-            "inputs": {"msg": "hello"},
-        })
+        status, data = _post(
+            cas_server,
+            "/compute",
+            {
+                "engine": "test_compute",
+                "task_type": "template",
+                "template": "echo",
+                "inputs": {"msg": "hello"},
+            },
+        )
         assert status == 200
         assert data["success"] is True
         assert data["engine"] == "test_compute"
@@ -254,11 +294,15 @@ class TestComputeCapability:
 
     def test_compute_unknown_template(self, cas_server):
         """Unknown template returns engine-level error (still 200, success=false)."""
-        status, data = _post(cas_server, "/compute", {
-            "engine": "test_compute",
-            "task_type": "template",
-            "template": "nonexistent_template",
-        })
+        status, data = _post(
+            cas_server,
+            "/compute",
+            {
+                "engine": "test_compute",
+                "task_type": "template",
+                "template": "nonexistent_template",
+            },
+        )
         assert status == 200
         assert data["success"] is False
         assert "UNKNOWN_TEMPLATE" in (data.get("error_code") or "")
@@ -270,13 +314,16 @@ class TestComputeCapability:
 
 
 class TestValidateBackwardCompat:
-
     def test_validate_still_works(self, cas_server):
         """Existing /validate endpoint remains functional."""
-        status, data = _post(cas_server, "/validate", {
-            "latex": "x^2",
-            "engines": ["test_validate"],
-        })
+        status, data = _post(
+            cas_server,
+            "/validate",
+            {
+                "latex": "x^2",
+                "engines": ["test_validate"],
+            },
+        )
         assert status == 200
         assert "results" in data
         assert data["results"][0]["engine"] == "test_validate"
@@ -289,7 +336,6 @@ class TestValidateBackwardCompat:
 
 
 class TestBaseEngineDefaults:
-
     def test_default_capabilities_is_validate(self):
         engine = _ValidateOnlyEngine()
         assert engine.capabilities == [Capability.VALIDATE]
@@ -297,7 +343,9 @@ class TestBaseEngineDefaults:
     def test_default_compute_returns_not_implemented(self):
         engine = _ValidateOnlyEngine()
         req = ComputeRequest(
-            engine="test", task_type="template", template="foo",
+            engine="test",
+            task_type="template",
+            template="foo",
         )
         result = engine.compute(req)
         assert result.success is False
@@ -316,6 +364,7 @@ class TestBaseEngineDefaults:
 
 class _UnavailableEngine(BaseEngine):
     """Engine that reports itself as unavailable."""
+
     name = "test_unavailable"
 
     def validate(self, latex: str) -> EngineResult:
@@ -373,19 +422,26 @@ def cas_server_unavailable():
 
 
 class TestValidateNoEngines:
-
     def test_503_when_no_engines_registered(self, cas_server_no_engines):
         """Should return 503 when no engines are registered."""
-        status, data = _post(cas_server_no_engines, "/validate", {
-            "latex": "x^2",
-        })
+        status, data = _post(
+            cas_server_no_engines,
+            "/validate",
+            {
+                "latex": "x^2",
+            },
+        )
         assert status == 503
         assert data["code"] == "NO_ENGINES"
 
     def test_503_when_all_engines_unavailable(self, cas_server_unavailable):
         """Should return 503 when engines exist but none available."""
-        status, data = _post(cas_server_unavailable, "/validate", {
-            "latex": "x^2",
-        })
+        status, data = _post(
+            cas_server_unavailable,
+            "/validate",
+            {
+                "latex": "x^2",
+            },
+        )
         assert status == 503
         assert data["code"] == "NO_ENGINES"

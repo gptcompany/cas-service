@@ -20,7 +20,6 @@ from cas_service.engines.wolframalpha_engine import WolframAlphaEngine
 
 
 class TestWACapabilities:
-
     def test_capabilities(self):
         engine = WolframAlphaEngine(app_id="test")
         assert Capability.COMPUTE in engine.capabilities
@@ -44,35 +43,44 @@ class TestWACapabilities:
 
 
 class TestWAAvailability:
-
     def test_available_with_appid(self):
         engine = WolframAlphaEngine(app_id="FAKE-ID")
         assert engine.is_available() is True
         assert engine.availability_reason is None
 
-    def test_unavailable_without_appid(self):
+    def test_unavailable_without_appid(self, monkeypatch):
+        monkeypatch.setenv("CAS_WOLFRAMALPHA_APPID", "ENV-SET")
         engine = WolframAlphaEngine(app_id="")
         assert engine.is_available() is False
         assert engine.availability_reason == "missing CAS_WOLFRAMALPHA_APPID"
 
-    def test_compute_when_unavailable(self):
+    def test_compute_when_unavailable(self, monkeypatch):
+        monkeypatch.setenv("CAS_WOLFRAMALPHA_APPID", "ENV-SET")
         engine = WolframAlphaEngine(app_id="")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="evaluate", inputs={"expression": "2+2"},
+            engine="wolframalpha",
+            task_type="template",
+            template="evaluate",
+            inputs={"expression": "2+2"},
         )
         result = engine.compute(req)
         assert result.success is False
         assert result.error_code == "ENGINE_UNAVAILABLE"
 
+    def test_none_appid_uses_environment(self, monkeypatch):
+        monkeypatch.setenv("CAS_WOLFRAMALPHA_APPID", "ENV-SET")
+        engine = WolframAlphaEngine()
+        assert engine.is_available() is True
+
 
 class TestWATemplateErrors:
-
     def test_unknown_template(self):
         engine = WolframAlphaEngine(app_id="FAKE")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="nonexistent", inputs={},
+            engine="wolframalpha",
+            task_type="template",
+            template="nonexistent",
+            inputs={},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -81,8 +89,10 @@ class TestWATemplateErrors:
     def test_missing_input(self):
         engine = WolframAlphaEngine(app_id="FAKE")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="evaluate", inputs={},
+            engine="wolframalpha",
+            task_type="template",
+            template="evaluate",
+            inputs={},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -90,7 +100,6 @@ class TestWATemplateErrors:
 
 
 class TestWAAPICall:
-
     def _mock_response(self, data: dict):
         """Create a mock urllib response."""
         mock = MagicMock()
@@ -101,19 +110,23 @@ class TestWAAPICall:
 
     @patch("cas_service.engines.wolframalpha_engine.urllib.request.urlopen")
     def test_successful_evaluate(self, mock_urlopen):
-        mock_urlopen.return_value = self._mock_response({
-            "queryresult": {
-                "success": True,
-                "pods": [
-                    {"id": "Input", "subpods": [{"plaintext": "2 + 2"}]},
-                    {"id": "Result", "subpods": [{"plaintext": "4"}]},
-                ],
-            },
-        })
+        mock_urlopen.return_value = self._mock_response(
+            {
+                "queryresult": {
+                    "success": True,
+                    "pods": [
+                        {"id": "Input", "subpods": [{"plaintext": "2 + 2"}]},
+                        {"id": "Result", "subpods": [{"plaintext": "4"}]},
+                    ],
+                },
+            }
+        )
         engine = WolframAlphaEngine(app_id="FAKE")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="evaluate", inputs={"expression": "2+2"},
+            engine="wolframalpha",
+            task_type="template",
+            template="evaluate",
+            inputs={"expression": "2+2"},
         )
         result = engine.compute(req)
         assert result.success is True
@@ -122,19 +135,26 @@ class TestWAAPICall:
 
     @patch("cas_service.engines.wolframalpha_engine.urllib.request.urlopen")
     def test_solve_template(self, mock_urlopen):
-        mock_urlopen.return_value = self._mock_response({
-            "queryresult": {
-                "success": True,
-                "pods": [
-                    {"id": "Input", "subpods": [{"plaintext": "solve x^2 = 4"}]},
-                    {"id": "Solution", "subpods": [{"plaintext": "x = -2 or x = 2"}]},
-                ],
-            },
-        })
+        mock_urlopen.return_value = self._mock_response(
+            {
+                "queryresult": {
+                    "success": True,
+                    "pods": [
+                        {"id": "Input", "subpods": [{"plaintext": "solve x^2 = 4"}]},
+                        {
+                            "id": "Solution",
+                            "subpods": [{"plaintext": "x = -2 or x = 2"}],
+                        },
+                    ],
+                },
+            }
+        )
         engine = WolframAlphaEngine(app_id="FAKE")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="solve", inputs={"equation": "x^2 = 4"},
+            engine="wolframalpha",
+            task_type="template",
+            template="solve",
+            inputs={"equation": "x^2 = 4"},
         )
         result = engine.compute(req)
         assert result.success is True
@@ -142,13 +162,17 @@ class TestWAAPICall:
 
     @patch("cas_service.engines.wolframalpha_engine.urllib.request.urlopen")
     def test_query_failed(self, mock_urlopen):
-        mock_urlopen.return_value = self._mock_response({
-            "queryresult": {"success": False, "tips": {"text": "Check input"}},
-        })
+        mock_urlopen.return_value = self._mock_response(
+            {
+                "queryresult": {"success": False, "tips": {"text": "Check input"}},
+            }
+        )
         engine = WolframAlphaEngine(app_id="FAKE")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="evaluate", inputs={"expression": "asdfgh"},
+            engine="wolframalpha",
+            task_type="template",
+            template="evaluate",
+            inputs={"expression": "asdfgh"},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -156,18 +180,22 @@ class TestWAAPICall:
 
     @patch("cas_service.engines.wolframalpha_engine.urllib.request.urlopen")
     def test_no_result_pod(self, mock_urlopen):
-        mock_urlopen.return_value = self._mock_response({
-            "queryresult": {
-                "success": True,
-                "pods": [
-                    {"id": "Input", "subpods": [{"plaintext": "hello"}]},
-                ],
-            },
-        })
+        mock_urlopen.return_value = self._mock_response(
+            {
+                "queryresult": {
+                    "success": True,
+                    "pods": [
+                        {"id": "Input", "subpods": [{"plaintext": "hello"}]},
+                    ],
+                },
+            }
+        )
         engine = WolframAlphaEngine(app_id="FAKE")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="evaluate", inputs={"expression": "hello"},
+            engine="wolframalpha",
+            task_type="template",
+            template="evaluate",
+            inputs={"expression": "hello"},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -176,12 +204,18 @@ class TestWAAPICall:
     @patch("cas_service.engines.wolframalpha_engine.urllib.request.urlopen")
     def test_http_403_auth_error(self, mock_urlopen):
         mock_urlopen.side_effect = urllib.error.HTTPError(
-            url="", code=403, msg="Forbidden", hdrs={}, fp=None,
+            url="",
+            code=403,
+            msg="Forbidden",
+            hdrs={},
+            fp=None,
         )
         engine = WolframAlphaEngine(app_id="BAD-KEY")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="evaluate", inputs={"expression": "2+2"},
+            engine="wolframalpha",
+            task_type="template",
+            template="evaluate",
+            inputs={"expression": "2+2"},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -192,8 +226,10 @@ class TestWAAPICall:
         mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
         engine = WolframAlphaEngine(app_id="FAKE")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="evaluate", inputs={"expression": "2+2"},
+            engine="wolframalpha",
+            task_type="template",
+            template="evaluate",
+            inputs={"expression": "2+2"},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -204,8 +240,10 @@ class TestWAAPICall:
         mock_urlopen.side_effect = TimeoutError("timed out")
         engine = WolframAlphaEngine(app_id="FAKE")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="evaluate", inputs={"expression": "2+2"},
+            engine="wolframalpha",
+            task_type="template",
+            template="evaluate",
+            inputs={"expression": "2+2"},
             timeout_s=3,
         )
         result = engine.compute(req)
@@ -215,21 +253,28 @@ class TestWAAPICall:
     @patch("cas_service.engines.wolframalpha_engine.urllib.request.urlopen")
     def test_fallback_to_non_input_pod(self, mock_urlopen):
         """When no Result/Solution pod, use first non-Input pod."""
-        mock_urlopen.return_value = self._mock_response({
-            "queryresult": {
-                "success": True,
-                "pods": [
-                    {"id": "Input", "subpods": [{"plaintext": "pi"}]},
-                    {"id": "DecimalApproximation", "subpods": [
-                        {"plaintext": "3.14159265358979..."},
-                    ]},
-                ],
-            },
-        })
+        mock_urlopen.return_value = self._mock_response(
+            {
+                "queryresult": {
+                    "success": True,
+                    "pods": [
+                        {"id": "Input", "subpods": [{"plaintext": "pi"}]},
+                        {
+                            "id": "DecimalApproximation",
+                            "subpods": [
+                                {"plaintext": "3.14159265358979..."},
+                            ],
+                        },
+                    ],
+                },
+            }
+        )
         engine = WolframAlphaEngine(app_id="FAKE")
         req = ComputeRequest(
-            engine="wolframalpha", task_type="template",
-            template="evaluate", inputs={"expression": "pi"},
+            engine="wolframalpha",
+            task_type="template",
+            template="evaluate",
+            inputs={"expression": "pi"},
         )
         result = engine.compute(req)
         assert result.success is True
@@ -266,13 +311,14 @@ def cas_server_with_wa():
 
 
 @pytest.fixture()
-def cas_server_wa_unavailable():
+def cas_server_wa_unavailable(monkeypatch):
     """Start CAS server with WolframAlpha engine without API key."""
     import cas_service.main as cas_main
 
     original_engines = cas_main.ENGINES.copy()
     cas_main.ENGINES.clear()
 
+    monkeypatch.setenv("CAS_WOLFRAMALPHA_APPID", "ENV-SET")
     wa_no_key = WolframAlphaEngine(app_id="")
     cas_main.ENGINES["wolframalpha"] = wa_no_key
 
@@ -290,6 +336,7 @@ def cas_server_wa_unavailable():
 
 def _get(addr, path):
     import http.client
+
     conn = http.client.HTTPConnection(addr[0], addr[1], timeout=5)
     conn.request("GET", path)
     resp = conn.getresponse()
@@ -301,9 +348,11 @@ def _get(addr, path):
 
 def _post(addr, path, body):
     import http.client
+
     conn = http.client.HTTPConnection(addr[0], addr[1], timeout=5)
     conn.request(
-        "POST", path,
+        "POST",
+        path,
         body=json.dumps(body),
         headers={"Content-Type": "application/json"},
     )
@@ -315,7 +364,6 @@ def _post(addr, path, body):
 
 
 class TestWAHTTPIntegration:
-
     def test_engines_shows_wa_available(self, cas_server_with_wa):
         status, data = _get(cas_server_with_wa, "/engines")
         assert status == 200
@@ -333,37 +381,47 @@ class TestWAHTTPIntegration:
         assert wa["availability_reason"] == "missing CAS_WOLFRAMALPHA_APPID"
 
     def test_compute_wa_unavailable_returns_503(self, cas_server_wa_unavailable):
-        status, data = _post(cas_server_wa_unavailable, "/compute", {
-            "engine": "wolframalpha",
-            "task_type": "template",
-            "template": "evaluate",
-            "inputs": {"expression": "2+2"},
-        })
+        status, data = _post(
+            cas_server_wa_unavailable,
+            "/compute",
+            {
+                "engine": "wolframalpha",
+                "task_type": "template",
+                "template": "evaluate",
+                "inputs": {"expression": "2+2"},
+            },
+        )
         assert status == 503
         assert data["code"] == "ENGINE_UNAVAILABLE"
 
     @patch("cas_service.engines.wolframalpha_engine.urllib.request.urlopen")
     def test_compute_wa_via_http(self, mock_urlopen, cas_server_with_wa):
         mock_resp = MagicMock()
-        mock_resp.read.return_value = json.dumps({
-            "queryresult": {
-                "success": True,
-                "pods": [
-                    {"id": "Input", "subpods": [{"plaintext": "2 + 2"}]},
-                    {"id": "Result", "subpods": [{"plaintext": "4"}]},
-                ],
-            },
-        }).encode()
+        mock_resp.read.return_value = json.dumps(
+            {
+                "queryresult": {
+                    "success": True,
+                    "pods": [
+                        {"id": "Input", "subpods": [{"plaintext": "2 + 2"}]},
+                        {"id": "Result", "subpods": [{"plaintext": "4"}]},
+                    ],
+                },
+            }
+        ).encode()
         mock_resp.__enter__ = MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_resp
 
-        status, data = _post(cas_server_with_wa, "/compute", {
-            "engine": "wolframalpha",
-            "task_type": "template",
-            "template": "evaluate",
-            "inputs": {"expression": "2+2"},
-        })
+        status, data = _post(
+            cas_server_with_wa,
+            "/compute",
+            {
+                "engine": "wolframalpha",
+                "task_type": "template",
+                "template": "evaluate",
+                "inputs": {"expression": "2+2"},
+            },
+        )
         assert status == 200
         assert data["success"] is True
         assert data["result"]["value"] == "4"

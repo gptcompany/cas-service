@@ -11,22 +11,43 @@ import re
 
 # Phase 1: Environment wrappers to strip
 _ENV_PATTERNS = [
-    r"\\begin\{equation\*?\}",    r"\\end\{equation\*?\}",
-    r"\\begin\{align\*?\}",       r"\\end\{align\*?\}",
-    r"\\begin\{gather\*?\}",      r"\\end\{gather\*?\}",
-    r"\\begin\{multline\*?\}",    r"\\end\{multline\*?\}",
-    r"\\begin\{eqnarray\*?\}",    r"\\end\{eqnarray\*?\}",
-    r"\\\[",                       r"\\\]",
-    r"\$\$",                       r"\$",
+    r"\\begin\{equation\*?\}",
+    r"\\end\{equation\*?\}",
+    r"\\begin\{align\*?\}",
+    r"\\end\{align\*?\}",
+    r"\\begin\{gather\*?\}",
+    r"\\end\{gather\*?\}",
+    r"\\begin\{multline\*?\}",
+    r"\\end\{multline\*?\}",
+    r"\\begin\{eqnarray\*?\}",
+    r"\\end\{eqnarray\*?\}",
+    r"\\\[",
+    r"\\\]",
+    r"\$\$",
+    r"\$",
 ]
 
 # Phase 2: Typographical commands to strip
 _STRIP_COMMANDS = [
-    r"\\left",  r"\\right",
-    r"\\displaystyle",  r"\\textstyle",  r"\\scriptstyle",
-    r"\\Big",  r"\\big",  r"\\bigg",  r"\\Bigg",
-    r"\\,",  r"\\;",  r"\\:",  r"\\!",  r"\\quad",  r"\\qquad",
-    r"&",  r"\\\\",  r"\\nonumber",  r"\\label\{[^}]*\}",
+    r"\\left",
+    r"\\right",
+    r"\\displaystyle",
+    r"\\textstyle",
+    r"\\scriptstyle",
+    r"\\Big",
+    r"\\big",
+    r"\\bigg",
+    r"\\Bigg",
+    r"\\,",
+    r"\\;",
+    r"\\:",
+    r"\\!",
+    r"\\quad",
+    r"\\qquad",
+    r"&",
+    r"\\\\",
+    r"\\nonumber",
+    r"\\label\{[^}]*\}",
     r"\\tag\{[^}]*\}",
 ]
 
@@ -43,18 +64,18 @@ _FONT_COMMANDS = [
 
 # Phase 3: Synonym mapping
 _SYNONYMS = {
-    r"\\dfrac":  r"\\frac",
-    r"\\tfrac":  r"\\frac",
-    r"\\ge":     r"\\geq",
-    r"\\le":     r"\\leq",
-    r"\\ne":     r"\\neq",
-    r"\\to":     r"\\rightarrow",
-    r"\\gets":   r"\\leftarrow",
-    r"\\land":   r"\\wedge",
-    r"\\lor":    r"\\vee",
-    r"\\lnot":   r"\\neg",
-    r"\\cdot":   "*",
-    r"\\times":  "*",
+    r"\\dfrac": r"\\frac",
+    r"\\tfrac": r"\\frac",
+    r"\\ge": r"\\geq",
+    r"\\le": r"\\leq",
+    r"\\ne": r"\\neq",
+    r"\\to": r"\\rightarrow",
+    r"\\gets": r"\\leftarrow",
+    r"\\land": r"\\wedge",
+    r"\\lor": r"\\vee",
+    r"\\lnot": r"\\neg",
+    r"\\cdot": "*",
+    r"\\times": "*",
 }
 
 

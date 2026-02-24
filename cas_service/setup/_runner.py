@@ -26,9 +26,7 @@ def run_steps(steps: list[SetupStep], console: Console) -> bool:
                 console.print(f"  [green]ok[/] {step.name} — already configured")
                 results.append((step.name, "ok"))
                 continue
-        if not questionary.confirm(
-            f"Configure {step.name}?", default=True
-        ).ask():
+        if not questionary.confirm(f"Configure {step.name}?", default=True).ask():
             console.print(f"  [yellow]skip[/] {step.name} — skipped")
             results.append((step.name, "skipped"))
             continue
@@ -65,9 +63,7 @@ def run_steps(steps: list[SetupStep], console: Console) -> bool:
     return all(s != "failed" for _, s in results)
 
 
-def _print_summary(
-    results: list[tuple[str, str]], console: Console
-) -> None:
+def _print_summary(results: list[tuple[str, str]], console: Console) -> None:
     """Print a summary table of all setup results."""
     table = Table(title="Setup Summary", show_lines=False)
     table.add_column("Step", style="bold")

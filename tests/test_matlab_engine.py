@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shutil
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -21,7 +21,6 @@ from cas_service.engines.matlab_engine import (
 
 
 class TestMatlabInputValidation:
-
     def test_valid_expression(self):
         assert _validate_input("x^2 + 1") is True
 
@@ -43,6 +42,9 @@ class TestMatlabInputValidation:
     def test_null_byte_rejected(self):
         assert _validate_input("x\x00y") is False
 
+    def test_newline_rejected(self):
+        assert _validate_input("x\n+1") is False
+
     def test_safe_math(self):
         assert _validate_input("sin(x) + cos(y)") is True
 
@@ -53,7 +55,6 @@ class TestMatlabInputValidation:
 
 
 class TestMatlabIsAvailable:
-
     def test_nonexistent_absolute_path(self):
         engine = MatlabEngine(matlab_path="/nonexistent/matlab")
         assert engine.is_available() is False
@@ -76,7 +77,6 @@ class TestMatlabIsAvailable:
 
 
 class TestMatlabCapabilities:
-
     def test_capabilities(self):
         engine = MatlabEngine()
         assert Capability.VALIDATE in engine.capabilities
@@ -97,13 +97,14 @@ class TestMatlabCapabilities:
 
 
 class TestMatlabComputeErrors:
-
     @patch.object(MatlabEngine, "is_available", return_value=True)
     def test_unknown_template(self, _mock):
         engine = MatlabEngine()
         req = ComputeRequest(
-            engine="matlab", task_type="template",
-            template="nonexistent", inputs={},
+            engine="matlab",
+            task_type="template",
+            template="nonexistent",
+            inputs={},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -113,8 +114,10 @@ class TestMatlabComputeErrors:
     def test_missing_input(self, _mock):
         engine = MatlabEngine()
         req = ComputeRequest(
-            engine="matlab", task_type="template",
-            template="evaluate", inputs={},
+            engine="matlab",
+            task_type="template",
+            template="evaluate",
+            inputs={},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -124,7 +127,8 @@ class TestMatlabComputeErrors:
     def test_invalid_input_value(self, _mock):
         engine = MatlabEngine()
         req = ComputeRequest(
-            engine="matlab", task_type="template",
+            engine="matlab",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "system('rm -rf /')"},
         )
@@ -135,7 +139,8 @@ class TestMatlabComputeErrors:
     def test_unavailable_engine(self):
         engine = MatlabEngine(matlab_path="/nonexistent/matlab")
         req = ComputeRequest(
-            engine="matlab", task_type="template",
+            engine="matlab",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "2+2"},
         )
@@ -150,14 +155,14 @@ class TestMatlabComputeErrors:
 
 
 class TestMatlabComputeMocked:
-
     @patch.object(MatlabEngine, "is_available", return_value=True)
     @patch.object(MatlabEngine, "_run_matlab")
     def test_successful_evaluate(self, mock_run, _avail):
         mock_run.return_value = "MATLAB_RESULT:42\n"
         engine = MatlabEngine()
         req = ComputeRequest(
-            engine="matlab", task_type="template",
+            engine="matlab",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "6*7"},
         )
@@ -171,7 +176,8 @@ class TestMatlabComputeMocked:
         mock_run.return_value = "MATLAB_RESULT:x + 1\n"
         engine = MatlabEngine()
         req = ComputeRequest(
-            engine="matlab", task_type="template",
+            engine="matlab",
+            task_type="template",
             template="simplify",
             inputs={"expression": "(x^2 + 2*x + 1)/(x + 1)"},
         )
@@ -185,7 +191,8 @@ class TestMatlabComputeMocked:
         mock_run.return_value = "MATLAB_RESULT:[2; -2]\n"
         engine = MatlabEngine()
         req = ComputeRequest(
-            engine="matlab", task_type="template",
+            engine="matlab",
+            task_type="template",
             template="solve",
             inputs={"equation": "x^2 - 4", "variable": "x"},
         )
@@ -199,13 +206,20 @@ class TestMatlabComputeMocked:
         mock_run.return_value = "some random output\n"
         engine = MatlabEngine()
         req = ComputeRequest(
-            engine="matlab", task_type="template",
+            engine="matlab",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "2+2"},
         )
         result = engine.compute(req)
         assert result.success is False
         assert result.error_code == "ENGINE_ERROR"
+
+    def test_evaluate_escapes_single_quotes_in_generated_code(self):
+        engine = MatlabEngine()
+        code = engine._build_compute_code("evaluate", {"expression": "A'+1"})
+        assert "expr = 'A''+1';" in code
+        assert "result = eval(expr);" in code
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +228,6 @@ class TestMatlabComputeMocked:
 
 
 class TestLatexToMatlab:
-
     def test_frac(self):
         assert "(a)/(b)" in _latex_to_matlab(r"\frac{a}{b}")
 
@@ -243,7 +256,6 @@ _matlab_available = shutil.which("matlab") is not None
 
 @pytest.mark.skipif(not _matlab_available, reason="MATLAB not installed")
 class TestMatlabIntegration:
-
     def test_validate_simple(self):
         engine = MatlabEngine(timeout=60)
         result = engine.validate("x^2 + 1")
@@ -252,7 +264,8 @@ class TestMatlabIntegration:
     def test_compute_evaluate(self):
         engine = MatlabEngine(timeout=60)
         req = ComputeRequest(
-            engine="matlab", task_type="template",
+            engine="matlab",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "2^10"},
             timeout_s=60,

@@ -74,9 +74,7 @@ class SageStep:
                         write_key("CAS_SAGE_PATH", path)
                         console.print(f"  [green]SageMath installed at {path}[/]")
                         return True
-                console.print(
-                    f"  [red]apt install failed:[/] {result.stderr[:200]}"
-                )
+                console.print(f"  [red]apt install failed:[/] {result.stderr[:200]}")
             except Exception as exc:
                 console.print(f"  [red]Auto-install failed: {exc}[/]")
         elif shutil.which("brew"):
@@ -96,9 +94,7 @@ class SageStep:
                         write_key("CAS_SAGE_PATH", path)
                         console.print(f"  [green]SageMath installed at {path}[/]")
                         return True
-                console.print(
-                    f"  [red]brew install failed:[/] {result.stderr[:200]}"
-                )
+                console.print(f"  [red]brew install failed:[/] {result.stderr[:200]}")
             except Exception as exc:
                 console.print(f"  [red]Auto-install failed: {exc}[/]")
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,6 +13,7 @@ from rich.console import Console
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _console() -> Console:
     """Return a no-output Console for testing (avoids terminal pollution)."""
@@ -34,9 +34,9 @@ def _completed(
 
 
 class TestPythonStep:
-
     def _make(self):
         from cas_service.setup._python import PythonStep
+
         return PythonStep()
 
     # -- check ---------------------------------------------------------------
@@ -150,16 +150,19 @@ class TestPythonStep:
 
 
 class TestMatlabStep:
-
     def _make(self):
         from cas_service.setup._matlab import MatlabStep
+
         return MatlabStep()
 
     # -- check ---------------------------------------------------------------
 
     @patch("cas_service.setup._matlab.os.access", return_value=True)
     @patch("cas_service.setup._matlab.os.path.isfile", return_value=True)
-    @patch("cas_service.setup._matlab.glob.glob", return_value=["/usr/local/MATLAB/R2025a/bin/matlab"])
+    @patch(
+        "cas_service.setup._matlab.glob.glob",
+        return_value=["/usr/local/MATLAB/R2025a/bin/matlab"],
+    )
     def test_check_found_direct_path(self, mock_glob, mock_isfile, mock_access):
         """check() returns True when MATLAB found at a standard path."""
         step = self._make()
@@ -191,10 +194,14 @@ class TestMatlabStep:
         mock_questionary = MagicMock()
         mock_questionary.text.return_value.ask.return_value = "/opt/matlab/bin/matlab"
         step = self._make()
-        with patch.dict("sys.modules", {"questionary": mock_questionary}), \
-             patch("cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None), \
-             patch("cas_service.setup._matlab.os.path.isfile", return_value=True), \
-             patch("cas_service.setup._matlab.os.access", return_value=True):
+        with (
+            patch.dict("sys.modules", {"questionary": mock_questionary}),
+            patch(
+                "cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None
+            ),
+            patch("cas_service.setup._matlab.os.path.isfile", return_value=True),
+            patch("cas_service.setup._matlab.os.access", return_value=True),
+        ):
             assert step.install(_console()) is True
             assert step._found_path == "/opt/matlab/bin/matlab"
 
@@ -203,9 +210,13 @@ class TestMatlabStep:
         mock_questionary = MagicMock()
         mock_questionary.text.return_value.ask.return_value = "/nope/matlab"
         step = self._make()
-        with patch.dict("sys.modules", {"questionary": mock_questionary}), \
-             patch("cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None), \
-             patch("cas_service.setup._matlab.os.path.isfile", return_value=False):
+        with (
+            patch.dict("sys.modules", {"questionary": mock_questionary}),
+            patch(
+                "cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None
+            ),
+            patch("cas_service.setup._matlab.os.path.isfile", return_value=False),
+        ):
             assert step.install(_console()) is False
 
     def test_install_user_skips(self):
@@ -213,16 +224,24 @@ class TestMatlabStep:
         mock_questionary = MagicMock()
         mock_questionary.text.return_value.ask.return_value = ""
         step = self._make()
-        with patch.dict("sys.modules", {"questionary": mock_questionary}), \
-             patch("cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None):
+        with (
+            patch.dict("sys.modules", {"questionary": mock_questionary}),
+            patch(
+                "cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None
+            ),
+        ):
             assert step.install(_console()) is False
 
     def test_install_questionary_unavailable(self):
         """install() returns False gracefully when questionary is not installed."""
         step = self._make()
         # Simulate questionary not being importable inside install()
-        with patch.dict("sys.modules", {"questionary": None}), \
-             patch("cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None):
+        with (
+            patch.dict("sys.modules", {"questionary": None}),
+            patch(
+                "cas_service.setup._matlab.MatlabStep._find_matlab", return_value=None
+            ),
+        ):
             # When module is None in sys.modules, import raises ImportError
             assert step.install(_console()) is False
 
@@ -232,8 +251,10 @@ class TestMatlabStep:
         """verify() returns True when _found_path is set and executable."""
         step = self._make()
         step._found_path = "/opt/matlab/bin/matlab"
-        with patch("cas_service.setup._matlab.os.path.isfile", return_value=True), \
-             patch("cas_service.setup._matlab.os.access", return_value=True):
+        with (
+            patch("cas_service.setup._matlab.os.path.isfile", return_value=True),
+            patch("cas_service.setup._matlab.os.access", return_value=True),
+        ):
             assert step.verify() is True
 
     def test_verify_no_path(self):
@@ -246,8 +267,10 @@ class TestMatlabStep:
         """verify() returns False when path exists but is not executable."""
         step = self._make()
         step._found_path = "/opt/matlab/bin/matlab"
-        with patch("cas_service.setup._matlab.os.path.isfile", return_value=True), \
-             patch("cas_service.setup._matlab.os.access", return_value=False):
+        with (
+            patch("cas_service.setup._matlab.os.path.isfile", return_value=True),
+            patch("cas_service.setup._matlab.os.access", return_value=False),
+        ):
             assert step.verify() is False
 
 
@@ -257,9 +280,9 @@ class TestMatlabStep:
 
 
 class TestSympyStep:
-
     def _make(self):
         from cas_service.setup._sympy import SympyStep
+
         return SympyStep()
 
     # -- check ---------------------------------------------------------------
@@ -343,14 +366,16 @@ class TestSympyStep:
 
 
 class TestServiceStep:
-
     def _make(self):
         from cas_service.setup._service import ServiceStep
+
         return ServiceStep()
 
     # -- check ---------------------------------------------------------------
 
-    @patch("cas_service.setup._service.ServiceStep._is_docker_running", return_value=False)
+    @patch(
+        "cas_service.setup._service.ServiceStep._is_docker_running", return_value=False
+    )
     @patch("cas_service.setup._service.subprocess.run")
     @patch("cas_service.setup._service.os.path.isfile", return_value=True)
     def test_check_enabled(self, mock_isfile, mock_run, _mock_docker):
@@ -365,7 +390,9 @@ class TestServiceStep:
         step = self._make()
         assert step.check() is False
 
-    @patch("cas_service.setup._service.ServiceStep._is_docker_running", return_value=False)
+    @patch(
+        "cas_service.setup._service.ServiceStep._is_docker_running", return_value=False
+    )
     @patch("cas_service.setup._service.subprocess.run")
     @patch("cas_service.setup._service.os.path.isfile", return_value=True)
     def test_check_disabled(self, mock_isfile, mock_run, _mock_docker):
@@ -386,7 +413,9 @@ class TestServiceStep:
 
     # -- install (systemd) ---------------------------------------------------
 
-    @patch("cas_service.setup._service.ServiceStep._has_docker_compose", return_value=False)
+    @patch(
+        "cas_service.setup._service.ServiceStep._has_docker_compose", return_value=False
+    )
     @patch("cas_service.setup._service.subprocess.run")
     @patch("cas_service.setup._service.shutil.which", return_value="/usr/bin/systemctl")
     @patch("cas_service.setup._service.os.path.isfile", return_value=True)
@@ -417,7 +446,9 @@ class TestServiceStep:
     @patch("cas_service.setup._service.shutil.which", return_value=None)
     @patch("cas_service.setup._service.os.path.isfile", return_value=True)
     @patch("cas_service.setup._service.questionary")
-    def test_install_no_systemctl_falls_back_to_foreground(self, mock_q, mock_isfile, mock_which):
+    def test_install_no_systemctl_falls_back_to_foreground(
+        self, mock_q, mock_isfile, mock_which
+    ):
         """install() falls back to foreground when systemctl is not available."""
         step = self._make()
         assert step.install(_console()) is True
@@ -480,9 +511,9 @@ class TestServiceStep:
 
 
 class TestVerifyStep:
-
     def _make(self):
         from cas_service.setup._verify import VerifyStep
+
         return VerifyStep()
 
     # -- _get_json helper ----------------------------------------------------
@@ -615,7 +646,6 @@ class TestVerifyStep:
 
 
 class TestRunner:
-
     def _make_step(
         self,
         name: str,
@@ -765,7 +795,6 @@ class TestRunner:
 
 
 class TestMain:
-
     @patch("cas_service.setup.main.run_steps", return_value=True)
     @patch("cas_service.setup.main.Console")
     def test_main_no_args_runs_all(self, mock_console_cls, mock_run_steps):
@@ -851,7 +880,6 @@ class TestMain:
 
 
 class TestPrintSummary:
-
     def test_print_summary_all_statuses(self):
         """_print_summary handles all status types without error."""
         from cas_service.setup._runner import _print_summary

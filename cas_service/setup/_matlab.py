@@ -51,7 +51,9 @@ class MatlabStep:
             console.print(f"  Saved CAS_MATLAB_PATH={path} to .env")
             return True
 
-        console.print("  MATLAB is [bold]optional[/] — the CAS service works without it.")
+        console.print(
+            "  MATLAB is [bold]optional[/] — the CAS service works without it."
+        )
         console.print("  Searched paths:")
         for pattern in _SEARCH_PATHS:
             console.print(f"    {pattern}")
@@ -71,16 +73,14 @@ class MatlabStep:
                 console.print(f"  [green]Saved CAS_MATLAB_PATH={custom}[/]")
                 return True
             if custom:
-                console.print(f"  [yellow]Path not found or not executable: {custom}[/]")
+                console.print(
+                    f"  [yellow]Path not found or not executable: {custom}[/]"
+                )
         except Exception:
             pass
 
-        console.print(
-            "  [yellow]MATLAB not found — skipping (this is fine).[/]"
-        )
-        console.print(
-            f"  To add later, set CAS_MATLAB_PATH in: [bold]{env_path()}[/]"
-        )
+        console.print("  [yellow]MATLAB not found — skipping (this is fine).[/]")
+        console.print(f"  To add later, set CAS_MATLAB_PATH in: [bold]{env_path()}[/]")
         return False
 
     def verify(self) -> bool:
