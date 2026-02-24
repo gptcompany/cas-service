@@ -293,8 +293,8 @@ class SageEngine(BaseEngine):
             if "==" in sage_expr:
                 is_equation = True
             # Single = but not <=, >=, !=
-            elif re.search(r"(?<![<>!])=(?!=)", sage_expr):
-                sage_expr = re.sub(r"(?<![<>!])=(?!=)", "==", sage_expr)
+            elif re.search(r"(?<![<>!=])=(?!=)", sage_expr):
+                sage_expr = re.sub(r"(?<![<>!=])=(?!=)", "==", sage_expr)
                 is_equation = True
 
         payload = json.dumps({

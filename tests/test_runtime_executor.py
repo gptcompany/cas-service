@@ -162,3 +162,20 @@ class TestJobDataclass:
     def test_exec_result_defaults(self):
         result = ExecResult(returncode=0, stdout="ok", stderr="", time_ms=10)
         assert result.timed_out is False
+        assert result.truncated is False
+
+
+class TestOutputTruncation:
+
+    def test_truncated_true_when_exceeds_cap(self):
+        executor = SubprocessExecutor(max_output=10)
+        result = executor.run(
+            ["python3", "-c", "print('A' * 100)"],
+        )
+        assert result.truncated is True
+        assert len(result.stdout) <= 10
+
+    def test_truncated_false_when_within_cap(self):
+        executor = SubprocessExecutor(max_output=1024)
+        result = executor.run(["echo", "short"])
+        assert result.truncated is False

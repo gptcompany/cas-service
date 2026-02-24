@@ -112,7 +112,19 @@ class CASHandler(BaseHTTPRequestHandler):
                 if Capability.VALIDATE in e.capabilities and e.is_available()
             ]
         else:
-            engines_requested = [_default_engine] if _default_engine else list(ENGINES.keys())
+            if _default_engine:
+                engines_requested = [_default_engine]
+            else:
+                engines_requested = [
+                    n for n, e in ENGINES.items()
+                    if Capability.VALIDATE in e.capabilities and e.is_available()
+                ]
+
+        if not engines_requested:
+            self._send_error(
+                "No validation engines available", "NO_ENGINES", 503,
+            )
+            return
 
         unknown = [e for e in engines_requested if e not in ENGINES]
         if unknown:
@@ -479,6 +491,11 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        for name, engine in ENGINES.items():
+            try:
+                engine.cleanup()
+            except Exception:
+                logger.exception("Error cleaning up engine %s", name)
         if _validate_pool:
             _validate_pool.shutdown(wait=False)
         server.server_close()

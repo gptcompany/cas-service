@@ -302,3 +302,90 @@ class TestBaseEngineDefaults:
         result = engine.compute(req)
         assert result.success is False
         assert result.error_code == "NOT_IMPLEMENTED"
+
+    def test_default_cleanup_is_noop(self):
+        engine = _ValidateOnlyEngine()
+        # cleanup should not raise
+        engine.cleanup()
+
+
+# ===========================================================================
+# /validate — 503 when no engines
+# ===========================================================================
+
+
+class _UnavailableEngine(BaseEngine):
+    """Engine that reports itself as unavailable."""
+    name = "test_unavailable"
+
+    def validate(self, latex: str) -> EngineResult:
+        return EngineResult(engine=self.name, success=False, error="unavailable")
+
+    def is_available(self) -> bool:
+        return False
+
+
+@pytest.fixture()
+def cas_server_no_engines():
+    """CAS server with no available engines and no default engine."""
+    import cas_service.main as cas_main
+
+    original_engines = cas_main.ENGINES.copy()
+    original_default = cas_main._default_engine
+    cas_main.ENGINES.clear()
+    cas_main._default_engine = ""
+
+    server = HTTPServer(("127.0.0.1", 0), cas_main.CASHandler)
+    port = server.server_address[1]
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    yield ("127.0.0.1", port)
+
+    server.shutdown()
+    cas_main.ENGINES.clear()
+    cas_main.ENGINES.update(original_engines)
+    cas_main._default_engine = original_default
+
+
+@pytest.fixture()
+def cas_server_unavailable():
+    """CAS server with only unavailable engines and no default engine."""
+    import cas_service.main as cas_main
+
+    original_engines = cas_main.ENGINES.copy()
+    original_default = cas_main._default_engine
+    cas_main.ENGINES.clear()
+    cas_main.ENGINES["test_unavailable"] = _UnavailableEngine()
+    cas_main._default_engine = ""
+
+    server = HTTPServer(("127.0.0.1", 0), cas_main.CASHandler)
+    port = server.server_address[1]
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    yield ("127.0.0.1", port)
+
+    server.shutdown()
+    cas_main.ENGINES.clear()
+    cas_main.ENGINES.update(original_engines)
+    cas_main._default_engine = original_default
+
+
+class TestValidateNoEngines:
+
+    def test_503_when_no_engines_registered(self, cas_server_no_engines):
+        """Should return 503 when no engines are registered."""
+        status, data = _post(cas_server_no_engines, "/validate", {
+            "latex": "x^2",
+        })
+        assert status == 503
+        assert data["code"] == "NO_ENGINES"
+
+    def test_503_when_all_engines_unavailable(self, cas_server_unavailable):
+        """Should return 503 when engines exist but none available."""
+        status, data = _post(cas_server_unavailable, "/validate", {
+            "latex": "x^2",
+        })
+        assert status == 503
+        assert data["code"] == "NO_ENGINES"
