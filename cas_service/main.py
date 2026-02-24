@@ -8,13 +8,9 @@ Usage:
 
 Environment:
     CAS_PORT=8769              # HTTP listen port
-    CAS_MAXIMA_PATH=/usr/bin/maxima  # Maxima binary path
-    CAS_MAXIMA_TIMEOUT=10      # Maxima subprocess timeout (seconds)
-    CAS_MATLAB_PATH=matlab                 # MATLAB binary (searches PATH)
-    CAS_MATLAB_TIMEOUT=30      # MATLAB subprocess timeout (seconds)
     CAS_SYMPY_TIMEOUT=5        # SymPy parse/simplify timeout (seconds)
-    CAS_GAP_PATH=gap           # GAP binary path
-    CAS_GAP_TIMEOUT=10         # GAP subprocess timeout (seconds)
+    CAS_MATLAB_PATH=matlab     # MATLAB binary (searches PATH)
+    CAS_MATLAB_TIMEOUT=30      # MATLAB subprocess timeout (seconds)
     CAS_SAGE_PATH=sage         # SageMath binary path
     CAS_SAGE_TIMEOUT=30        # SageMath subprocess timeout (seconds)
     CAS_WOLFRAMALPHA_APPID=    # WolframAlpha API key (optional)
@@ -35,9 +31,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 from cas_service.engines.base import Capability, ComputeRequest
-from cas_service.engines.gap_engine import GapEngine
 from cas_service.engines.matlab_engine import MatlabEngine
-from cas_service.engines.maxima_engine import MaximaEngine
 from cas_service.engines.sage_engine import SageEngine
 from cas_service.engines.sympy_engine import SympyEngine
 from cas_service.engines.wolframalpha_engine import WolframAlphaEngine
@@ -170,8 +164,6 @@ class CASHandler(BaseHTTPRequestHandler):
                 "available": engine.is_available(),
                 "version": engine.get_version(),
             }
-            if hasattr(engine, "maxima_path"):
-                info["path"] = engine.maxima_path
             engines_info[name] = info
 
         self._send_json({
@@ -399,17 +391,9 @@ def _init_engines() -> None:
         ("sympy", lambda: SympyEngine(
             timeout=int(os.environ.get("CAS_SYMPY_TIMEOUT", "5")),
         )),
-        ("maxima", lambda: MaximaEngine(
-            maxima_path=os.environ.get("CAS_MAXIMA_PATH", "/usr/bin/maxima"),
-            timeout=int(os.environ.get("CAS_MAXIMA_TIMEOUT", "10")),
-        )),
         ("matlab", lambda: MatlabEngine(
             matlab_path=os.environ.get("CAS_MATLAB_PATH", "matlab"),
             timeout=int(os.environ.get("CAS_MATLAB_TIMEOUT", "30")),
-        )),
-        ("gap", lambda: GapEngine(
-            gap_path=os.environ.get("CAS_GAP_PATH", "gap"),
-            timeout=int(os.environ.get("CAS_GAP_TIMEOUT", "10")),
         )),
         ("sage", lambda: SageEngine(
             sage_path=os.environ.get("CAS_SAGE_PATH", "sage"),

@@ -107,7 +107,10 @@ class TestSageEngineCapabilities:
         assert "differentiate" in templates
         assert "matrix_rank" in templates
         assert "latex_to_sage" in templates
-        assert len(templates) == 8
+        assert "group_order" in templates
+        assert "is_abelian" in templates
+        assert "center_size" in templates
+        assert len(templates) == 11
 
 
 # ---------------------------------------------------------------------------
@@ -388,6 +391,115 @@ class TestSageIntegrationCompute:
         result = engine.compute(req)
         assert result.success is True
         assert "x^2" in result.result["value"]
+
+    def test_group_order(self):
+        engine = SageEngine(timeout=60)
+        req = ComputeRequest(
+            engine="sage", task_type="template",
+            template="group_order",
+            inputs={"group_expr": "SymmetricGroup(3)"},
+            timeout_s=60,
+        )
+        result = engine.compute(req)
+        assert result.success is True
+        assert result.result["value"] == "6"
+
+    def test_is_abelian(self):
+        engine = SageEngine(timeout=60)
+        req = ComputeRequest(
+            engine="sage", task_type="template",
+            template="is_abelian",
+            inputs={"group_expr": "SymmetricGroup(3)"},
+            timeout_s=60,
+        )
+        result = engine.compute(req)
+        assert result.success is True
+        assert result.result["value"] == "False"
+
+    def test_center_size(self):
+        engine = SageEngine(timeout=60)
+        req = ComputeRequest(
+            engine="sage", task_type="template",
+            template="center_size",
+            inputs={"group_expr": "SymmetricGroup(3)"},
+            timeout_s=60,
+        )
+        result = engine.compute(req)
+        assert result.success is True
+        assert result.result["value"] == "1"
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — mocked group theory templates
+# ---------------------------------------------------------------------------
+
+
+class TestSageGroupTheoryMocked:
+
+    @patch.object(SageEngine, "is_available", return_value=True)
+    def test_group_order_mocked(self, _avail):
+        engine = SageEngine()
+        mock_result = ExecResult(
+            returncode=0, stdout="SAGE_RESULT:6\n", stderr="", time_ms=200,
+        )
+        engine._executor = MagicMock()
+        engine._executor.run.return_value = mock_result
+
+        req = ComputeRequest(
+            engine="sage", task_type="template",
+            template="group_order",
+            inputs={"group_expr": "SymmetricGroup(3)"},
+        )
+        result = engine.compute(req)
+        assert result.success is True
+        assert result.result == {"value": "6"}
+
+    @patch.object(SageEngine, "is_available", return_value=True)
+    def test_is_abelian_mocked(self, _avail):
+        engine = SageEngine()
+        mock_result = ExecResult(
+            returncode=0, stdout="SAGE_RESULT:False\n", stderr="", time_ms=200,
+        )
+        engine._executor = MagicMock()
+        engine._executor.run.return_value = mock_result
+
+        req = ComputeRequest(
+            engine="sage", task_type="template",
+            template="is_abelian",
+            inputs={"group_expr": "SymmetricGroup(3)"},
+        )
+        result = engine.compute(req)
+        assert result.success is True
+        assert result.result == {"value": "False"}
+
+    @patch.object(SageEngine, "is_available", return_value=True)
+    def test_center_size_mocked(self, _avail):
+        engine = SageEngine()
+        mock_result = ExecResult(
+            returncode=0, stdout="SAGE_RESULT:1\n", stderr="", time_ms=200,
+        )
+        engine._executor = MagicMock()
+        engine._executor.run.return_value = mock_result
+
+        req = ComputeRequest(
+            engine="sage", task_type="template",
+            template="center_size",
+            inputs={"group_expr": "SymmetricGroup(3)"},
+        )
+        result = engine.compute(req)
+        assert result.success is True
+        assert result.result == {"value": "1"}
+
+    @patch.object(SageEngine, "is_available", return_value=True)
+    def test_group_order_missing_input(self, _avail):
+        engine = SageEngine()
+        req = ComputeRequest(
+            engine="sage", task_type="template",
+            template="group_order", inputs={},
+        )
+        result = engine.compute(req)
+        assert result.success is False
+        assert result.error_code == "MISSING_INPUT"
 
 
 # ---------------------------------------------------------------------------

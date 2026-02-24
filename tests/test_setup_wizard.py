@@ -145,111 +145,6 @@ class TestPythonStep:
 
 
 # ===========================================================================
-# MaximaStep
-# ===========================================================================
-
-
-class TestMaximaStep:
-
-    def _make(self):
-        from cas_service.setup._maxima import MaximaStep
-        return MaximaStep()
-
-    # -- check ---------------------------------------------------------------
-
-    @patch("cas_service.setup._maxima.subprocess.run")
-    @patch("cas_service.setup._maxima.shutil.which", return_value="/usr/bin/maxima")
-    def test_check_good_version(self, mock_which, mock_run):
-        """check() returns True for Maxima 5.47.0 (>= 5.44)."""
-        mock_run.return_value = _completed(0, stdout="Maxima 5.47.0")
-        step = self._make()
-        assert step.check() is True
-
-    @patch("cas_service.setup._maxima.subprocess.run")
-    @patch("cas_service.setup._maxima.shutil.which", return_value="/usr/bin/maxima")
-    def test_check_old_version(self, mock_which, mock_run):
-        """check() returns False for Maxima 5.43 (< 5.44)."""
-        mock_run.return_value = _completed(0, stdout="Maxima 5.43.2")
-        step = self._make()
-        assert step.check() is False
-
-    @patch("cas_service.setup._maxima.shutil.which", return_value=None)
-    def test_check_not_installed(self, mock_which):
-        """check() returns False when maxima is not on PATH."""
-        step = self._make()
-        assert step.check() is False
-
-    @patch("cas_service.setup._maxima.subprocess.run", side_effect=OSError("not found"))
-    @patch("cas_service.setup._maxima.shutil.which", return_value="/usr/bin/maxima")
-    def test_check_version_exception(self, mock_which, mock_run):
-        """check() returns False when --version subprocess fails."""
-        step = self._make()
-        assert step.check() is False
-
-    @patch("cas_service.setup._maxima.subprocess.run")
-    @patch("cas_service.setup._maxima.shutil.which", return_value="/usr/bin/maxima")
-    def test_check_unparseable_version(self, mock_which, mock_run):
-        """check() returns False when version output cannot be parsed."""
-        mock_run.return_value = _completed(0, stdout="something unexpected")
-        step = self._make()
-        assert step.check() is False
-
-    # -- install -------------------------------------------------------------
-
-    @patch("cas_service.setup._maxima.subprocess.run")
-    @patch("cas_service.setup._maxima.shutil.which")
-    def test_install_apt_success(self, mock_which, mock_run):
-        """install() auto-installs via apt on Debian and returns True."""
-        mock_which.return_value = "/usr/bin/apt-get"
-        mock_run.return_value = _completed(0)
-        step = self._make()
-        assert step.install(_console()) is True
-
-    @patch("cas_service.setup._maxima.subprocess.run")
-    @patch("cas_service.setup._maxima.shutil.which")
-    def test_install_apt_fails(self, mock_which, mock_run):
-        """install() returns False when apt install fails."""
-        mock_which.return_value = "/usr/bin/apt-get"
-        mock_run.return_value = _completed(1, stderr="E: Unable to locate package")
-        step = self._make()
-        assert step.install(_console()) is False
-
-    @patch("cas_service.setup._maxima.shutil.which", return_value=None)
-    def test_install_no_apt(self, mock_which):
-        """install() returns False on non-apt platform (manual install needed)."""
-        step = self._make()
-        assert step.install(_console()) is False
-
-    @patch("cas_service.setup._maxima.subprocess.run", side_effect=OSError("no sudo"))
-    @patch("cas_service.setup._maxima.shutil.which", return_value="/usr/bin/apt-get")
-    def test_install_exception(self, mock_which, mock_run):
-        """install() returns False on subprocess exception."""
-        step = self._make()
-        assert step.install(_console()) is False
-
-    # -- verify --------------------------------------------------------------
-
-    @patch("cas_service.setup._maxima.subprocess.run")
-    @patch("cas_service.setup._maxima.shutil.which", return_value="/usr/bin/maxima")
-    def test_verify_delegates_to_check(self, mock_which, mock_run):
-        """verify() calls check() internally."""
-        mock_run.return_value = _completed(0, stdout="Maxima 5.47.0")
-        step = self._make()
-        assert step.verify() is True
-
-    # -- _get_version --------------------------------------------------------
-
-    def test_get_version_exact_boundary(self):
-        """_get_version parses exact minimum 5.44."""
-        from cas_service.setup._maxima import MaximaStep
-
-        with patch("cas_service.setup._maxima.subprocess.run") as mock_run:
-            mock_run.return_value = _completed(0, stdout="Maxima 5.44.0")
-            result = MaximaStep._get_version("/usr/bin/maxima")
-            assert result == (5, 44)
-
-
-# ===========================================================================
 # MatlabStep
 # ===========================================================================
 
@@ -663,9 +558,9 @@ class TestVerifyStep:
                         "description": "SymPy engine",
                     },
                     {
-                        "name": "maxima",
+                        "name": "sage",
                         "available": True,
-                        "description": "Maxima engine",
+                        "description": "SageMath engine",
                     },
                     {
                         "name": "matlab",
@@ -877,7 +772,7 @@ class TestMain:
         main(args=[])
         mock_run_steps.assert_called_once()
         steps = mock_run_steps.call_args[0][0]
-        assert len(steps) == 9  # Python, SymPy, Maxima, GAP, MATLAB, Sage, WA, Service, Verify
+        assert len(steps) == 7  # Python, SymPy, MATLAB, Sage, WA, Service, Verify
 
     @patch("cas_service.setup.main.run_steps", return_value=True)
     @patch("cas_service.setup.main.Console")
@@ -889,7 +784,7 @@ class TestMain:
         main(args=["engines"])
         mock_run_steps.assert_called_once()
         steps = mock_run_steps.call_args[0][0]
-        assert len(steps) == 6  # SymPy, Maxima, GAP, MATLAB, Sage, WA
+        assert len(steps) == 4  # SymPy, MATLAB, Sage, WA
 
     @patch("cas_service.setup.main.run_steps", return_value=True)
     @patch("cas_service.setup.main.Console")

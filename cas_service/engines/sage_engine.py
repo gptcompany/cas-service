@@ -170,6 +170,15 @@ try:
             _out(matrix(m).rank())
     elif task == 'latex_to_sage':
         _out(sage_eval(inputs['expression'], locals=_lcl))
+    elif task == 'group_order':
+        g = sage_eval(inputs['group_expr'], locals=_lcl)
+        _out(g.order())
+    elif task == 'is_abelian':
+        g = sage_eval(inputs['group_expr'], locals=_lcl)
+        _out(g.is_abelian())
+    elif task == 'center_size':
+        g = sage_eval(inputs['group_expr'], locals=_lcl)
+        _out(g.center().order())
     else:
         print('SAGE_ERROR:Unknown task: ' + task)
 except Exception as e:
@@ -216,6 +225,18 @@ _TEMPLATES: dict[str, dict[str, Any]] = {
     "latex_to_sage": {
         "required_inputs": ["expression"],
         "description": "Parse LaTeX and return Sage representation",
+    },
+    "group_order": {
+        "required_inputs": ["group_expr"],
+        "description": "Compute the order (size) of a group",
+    },
+    "is_abelian": {
+        "required_inputs": ["group_expr"],
+        "description": "Check if a group is abelian",
+    },
+    "center_size": {
+        "required_inputs": ["group_expr"],
+        "description": "Compute the size of the center of a group",
     },
 }
 

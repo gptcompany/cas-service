@@ -17,11 +17,6 @@ _VALIDATE_SMOKE = {
 }
 
 _COMPUTE_SMOKE: dict[str, dict] = {
-    "gap": {
-        "template": "group_order",
-        "inputs": {"group_expr": "SymmetricGroup(3)"},
-        "expected_value": "6",
-    },
     "wolframalpha": {
         "template": "evaluate",
         "inputs": {"expression": "2+2"},

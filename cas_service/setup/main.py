@@ -27,9 +27,7 @@ BANNER = r"""
 
 def _all_steps() -> list:
     """Return the full ordered list of setup steps."""
-    from cas_service.setup._gap import GapStep
     from cas_service.setup._python import PythonStep
-    from cas_service.setup._maxima import MaximaStep
     from cas_service.setup._matlab import MatlabStep
     from cas_service.setup._sage import SageStep
     from cas_service.setup._sympy import SympyStep
@@ -40,8 +38,6 @@ def _all_steps() -> list:
     return [
         PythonStep(),
         SympyStep(),
-        MaximaStep(),
-        GapStep(),
         MatlabStep(),
         SageStep(),
         WolframAlphaStep(),
@@ -52,8 +48,6 @@ def _all_steps() -> list:
 
 def _engine_steps() -> list:
     """Return engine-only setup steps."""
-    from cas_service.setup._gap import GapStep
-    from cas_service.setup._maxima import MaximaStep
     from cas_service.setup._matlab import MatlabStep
     from cas_service.setup._sage import SageStep
     from cas_service.setup._sympy import SympyStep
@@ -61,8 +55,6 @@ def _engine_steps() -> list:
 
     return [
         SympyStep(),
-        MaximaStep(),
-        GapStep(),
         MatlabStep(),
         SageStep(),
         WolframAlphaStep(),
@@ -78,15 +70,11 @@ def _service_steps() -> list:
 
 def _configure_steps() -> list:
     """Return engine configuration steps (path prompts, API keys)."""
-    from cas_service.setup._gap import GapStep
-    from cas_service.setup._maxima import MaximaStep
     from cas_service.setup._matlab import MatlabStep
     from cas_service.setup._sage import SageStep
     from cas_service.setup._wolframalpha import WolframAlphaStep
 
     return [
-        MaximaStep(),
-        GapStep(),
         MatlabStep(),
         SageStep(),
         WolframAlphaStep(),
@@ -101,7 +89,7 @@ def _verify_steps() -> list:
 
 
 SUBCOMMANDS = {
-    "engines": (_engine_steps, "Check CAS engines (SymPy, Maxima, GAP, MATLAB, Sage, WA)"),
+    "engines": (_engine_steps, "Check CAS engines (SymPy, MATLAB, Sage, WA)"),
     "configure": (_configure_steps, "Re-configure engine paths and API keys"),
     "service": (_service_steps, "Configure service deployment"),
     "verify": (_verify_steps, "Verify running service health + engine smoke tests"),
