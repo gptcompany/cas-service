@@ -123,11 +123,8 @@ class ServiceStep:
         console.print()
         console.print("  Environment variables (optional):")
         console.print("    CAS_PORT=8769")
-        console.print("    CAS_MAXIMA_PATH=/usr/bin/maxima")
-        console.print("    CAS_GAP_PATH=gap")
-        console.print("    CAS_GAP_TIMEOUT=10")
+        console.print("    CAS_SAGE_PATH=sage")
         console.print("    CAS_WOLFRAMALPHA_APPID=<your-appid>  # optional remote engine")
-        console.print("    CAS_SAGE_PATH=sage                   # future")
         console.print("    CAS_LOG_LEVEL=INFO")
         console.print()
         return True
