@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import signal
+import threading
 import time
 
 from cas_service.engines.base import BaseEngine, EngineResult
@@ -17,6 +18,11 @@ class _Timeout(Exception):
 
 def _timeout_handler(signum: int, frame: object) -> None:
     raise _Timeout()
+
+
+def _in_main_thread() -> bool:
+    """Check if current thread is the main thread (signal only works there)."""
+    return threading.current_thread() is threading.main_thread()
 
 
 class SympyEngine(BaseEngine):
@@ -57,8 +63,9 @@ class SympyEngine(BaseEngine):
 
     def _parse(self, latex: str) -> object:
         """Parse LaTeX with ANTLR backend, fallback to Lark."""
-        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(self.timeout)
+        if _in_main_thread():
+            old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+            signal.alarm(self.timeout)
         try:
             from sympy.parsing.latex import parse_latex
             try:
@@ -66,15 +73,17 @@ class SympyEngine(BaseEngine):
             except Exception:
                 return parse_latex(latex, backend="lark")
         finally:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
+            if _in_main_thread():
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
 
     def _evaluate(self, expr: object, latex: str) -> tuple[object, bool]:
         """Simplify expression. For equations, check lhs == rhs."""
         import sympy
 
-        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(self.timeout)
+        if _in_main_thread():
+            old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+            signal.alarm(self.timeout)
         try:
             if isinstance(expr, sympy.Eq):
                 diff = sympy.simplify(expr.lhs - expr.rhs)
@@ -90,8 +99,9 @@ class SympyEngine(BaseEngine):
             simplified = sympy.simplify(expr)
             return simplified, True
         finally:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
+            if _in_main_thread():
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
 
     def _is_equation_str(self, latex: str) -> bool:
         """Check if latex contains a standalone = sign (not <=, >=, !=)."""
