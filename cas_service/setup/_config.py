@@ -53,7 +53,9 @@ def write_key(key: str, value: str) -> None:
 def get_key(key: str) -> str | None:
     """Get a single key value, checking .env then os.environ."""
     config = read_config()
-    return config.get(key) or os.environ.get(key) or None
+    if key in config:
+        return config[key]
+    return os.environ.get(key) or None
 
 
 def get_cas_port(default: int = DEFAULT_CAS_PORT) -> int:
