@@ -75,12 +75,23 @@ Default port: **8769**
 | `GET /health` | Health check (includes engine count) |
 | `GET /status` | Full status with engine versions |
 | `GET /engines` | List engines with capabilities and versions |
-| `POST /validate` | Validate LaTeX formula (parallel, multi-engine) |
+| `POST /validate` | Validate LaTeX formula (default: single engine, opt-in consensus) |
 | `POST /compute` | Run a template-based compute task |
 
 ### Validate Example
 
 ```bash
+# Default: single engine (SageMath if available, else SymPy)
+curl -s -X POST http://localhost:8769/validate \
+  -H "Content-Type: application/json" \
+  -d '{"latex": "x^2 + 2*x + 1"}' | jq .
+
+# Consensus: multi-engine parallel validation (opt-in)
+curl -s -X POST http://localhost:8769/validate \
+  -H "Content-Type: application/json" \
+  -d '{"latex": "x^2 + 2*x + 1", "consensus": true}' | jq .
+
+# Specific engines
 curl -s -X POST http://localhost:8769/validate \
   -H "Content-Type: application/json" \
   -d '{"latex": "x^2 + 2*x + 1", "engines": ["sympy", "maxima", "sage"]}' | jq .
@@ -110,6 +121,7 @@ curl -s -X POST http://localhost:8769/compute \
 | Variable | Default | Engine | Description |
 |----------|---------|--------|-------------|
 | `CAS_PORT` | `8769` | - | HTTP listen port |
+| `CAS_DEFAULT_ENGINE` | `sage` | - | Default validation engine (auto: sage > sympy > first) |
 | `CAS_SYMPY_TIMEOUT` | `5` | SymPy | Parse/simplify timeout (s) |
 | `CAS_MAXIMA_PATH` | `/usr/bin/maxima` | Maxima | Binary path |
 | `CAS_MAXIMA_TIMEOUT` | `10` | Maxima | Subprocess timeout (s) |

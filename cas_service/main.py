@@ -50,6 +50,9 @@ ENGINES: dict[str, Any] = {}
 
 _start_time: float = 0.0
 
+# Default validation engine (set during init, overridable via CAS_DEFAULT_ENGINE)
+_default_engine: str = ""
+
 # Thread pool for parallel validation (one thread per engine)
 _validate_pool: ThreadPoolExecutor | None = None
 
@@ -100,7 +103,22 @@ class CASHandler(BaseHTTPRequestHandler):
             self._send_error("latex field is required", "INVALID_REQUEST", 400)
             return
 
-        engines_requested = data.get("engines", list(ENGINES.keys()))
+        consensus = data.get("consensus", False)
+        engines_explicit = data.get("engines")
+
+        # Determine which engines to use:
+        # - "engines" explicit list → use those
+        # - "consensus": true → all validation engines
+        # - default → single default engine
+        if engines_explicit is not None:
+            engines_requested = engines_explicit
+        elif consensus:
+            engines_requested = [
+                n for n, e in ENGINES.items()
+                if Capability.VALIDATE in e.capabilities and e.is_available()
+            ]
+        else:
+            engines_requested = [_default_engine] if _default_engine else list(ENGINES.keys())
 
         unknown = [e for e in engines_requested if e not in ENGINES]
         if unknown:
@@ -122,12 +140,13 @@ class CASHandler(BaseHTTPRequestHandler):
         # Log request
         successes = sum(1 for r in results if r.get("success"))
         logger.info(
-            "validate latex=%s engines=%d success=%d time_ms=%d",
-            latex[:50], len(results), successes, elapsed,
+            "validate latex=%s engines=%d success=%d time_ms=%d consensus=%s",
+            latex[:50], len(results), successes, elapsed, consensus,
         )
 
         self._send_json({
             "results": results,
+            "consensus": consensus,
             "latex_preprocessed": preprocessed,
             "time_ms": elapsed,
         })
@@ -157,8 +176,9 @@ class CASHandler(BaseHTTPRequestHandler):
 
         self._send_json({
             "service": "cas-service",
-            "version": "0.2.0",
+            "version": "0.3.0",
             "uptime_seconds": round(time.time() - _start_time, 1),
+            "default_engine": _default_engine,
             "engines": engines_info,
         })
 
@@ -373,7 +393,7 @@ def _validate_one(engine_name: str, preprocessed: str) -> dict[str, Any]:
 
 def _init_engines() -> None:
     """Initialize engine registry with graceful per-engine failure handling."""
-    global ENGINES, _validate_pool
+    global ENGINES, _validate_pool, _default_engine
 
     engine_configs = [
         ("sympy", lambda: SympyEngine(
@@ -417,6 +437,24 @@ def _init_engines() -> None:
     logger.info(
         "Initialized %d engines (%d available)", len(ENGINES), available_count,
     )
+
+    # Set default validation engine: env override > sage > sympy > first available
+    env_default = os.environ.get("CAS_DEFAULT_ENGINE", "")
+    if env_default and env_default in ENGINES and ENGINES[env_default].is_available():
+        _default_engine = env_default
+    else:
+        # Prefer sage, then sympy, then first available validation engine
+        for candidate in ["sage", "sympy"]:
+            if candidate in ENGINES and ENGINES[candidate].is_available():
+                _default_engine = candidate
+                break
+        else:
+            for name, engine in ENGINES.items():
+                if Capability.VALIDATE in engine.capabilities and engine.is_available():
+                    _default_engine = name
+                    break
+    if _default_engine:
+        logger.info("Default validation engine: %s", _default_engine)
 
     # Create thread pool sized to number of engines
     _validate_pool = ThreadPoolExecutor(
