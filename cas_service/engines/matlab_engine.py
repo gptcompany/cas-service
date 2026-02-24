@@ -5,11 +5,20 @@ from __future__ import annotations
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
 
-from cas_service.engines.base import BaseEngine, EngineResult
+from typing import Any
+
+from cas_service.engines.base import (
+    BaseEngine,
+    Capability,
+    ComputeRequest,
+    ComputeResult,
+    EngineResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +93,58 @@ def _latex_to_matlab(latex: str) -> str:
     return result.strip()
 
 
+# ---------------------------------------------------------------------------
+# Input sanitization
+# ---------------------------------------------------------------------------
+
+_BLOCKED_PATTERNS = re.compile(
+    r"(system\s*\(|unix\s*\(|dos\s*\(|perl\s*\(|python\s*\("
+    r"|java\s*\(|eval\s*\(|feval\s*\(|evalc\s*\("
+    r"|urlread|webread|websave|fopen|fclose|fwrite|fread"
+    r"|delete\s*\(|rmdir|mkdir|movefile|copyfile"
+    r"|setenv|getenv|!)",
+    re.IGNORECASE,
+)
+
+
+def _validate_input(value: str) -> bool:
+    """Safety check on a MATLAB input value."""
+    if not value or len(value) > 500:
+        return False
+    if _BLOCKED_PATTERNS.search(value):
+        return False
+    if "\x00" in value:
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Template definitions
+# ---------------------------------------------------------------------------
+
+_TEMPLATES: dict[str, dict[str, Any]] = {
+    "evaluate": {
+        "required_inputs": ["expression"],
+        "description": "Evaluate a mathematical expression",
+    },
+    "simplify": {
+        "required_inputs": ["expression"],
+        "description": "Simplify a mathematical expression",
+    },
+    "solve": {
+        "required_inputs": ["equation"],
+        "optional_inputs": ["variable"],
+        "description": "Solve an equation for a variable (default: x)",
+    },
+    "factor": {
+        "required_inputs": ["expression"],
+        "description": "Factor a polynomial expression",
+    },
+}
+
+
 class MatlabEngine(BaseEngine):
-    """Validate LaTeX formulas using MATLAB Symbolic Math Toolbox."""
+    """Validate and compute using MATLAB Symbolic Math Toolbox."""
 
     name = "matlab"
 
@@ -210,7 +269,154 @@ class MatlabEngine(BaseEngine):
         return bool(re.search(r"(?<![<>!:=])=(?!=)", expr))
 
     def is_available(self) -> bool:
-        return os.path.isfile(self.matlab_path)
+        if os.path.isabs(self.matlab_path):
+            return os.path.isfile(self.matlab_path) and os.access(self.matlab_path, os.X_OK)
+        return shutil.which(self.matlab_path) is not None
+
+    # -- compute -----------------------------------------------------------
+
+    def compute(self, request: ComputeRequest) -> ComputeResult:
+        start = time.time()
+
+        if not self.is_available():
+            return ComputeResult(
+                engine=self.name,
+                success=False,
+                error="MATLAB binary not found",
+                error_code="ENGINE_UNAVAILABLE",
+                time_ms=int((time.time() - start) * 1000),
+            )
+
+        tmpl = _TEMPLATES.get(request.template)
+        if tmpl is None:
+            return ComputeResult(
+                engine=self.name,
+                success=False,
+                error=f"Unknown template: {request.template}",
+                error_code="UNKNOWN_TEMPLATE",
+                time_ms=int((time.time() - start) * 1000),
+            )
+
+        # Check required inputs
+        missing = [
+            k for k in tmpl["required_inputs"] if k not in request.inputs
+        ]
+        if missing:
+            return ComputeResult(
+                engine=self.name,
+                success=False,
+                error=f"Missing required inputs: {', '.join(missing)}",
+                error_code="MISSING_INPUT",
+                time_ms=int((time.time() - start) * 1000),
+            )
+
+        # Sanitize all inputs
+        for key, value in request.inputs.items():
+            if not _validate_input(value):
+                return ComputeResult(
+                    engine=self.name,
+                    success=False,
+                    error=f"Invalid input value for '{key}'",
+                    error_code="INVALID_INPUT",
+                    time_ms=int((time.time() - start) * 1000),
+                )
+
+        matlab_code = self._build_compute_code(request.template, request.inputs)
+
+        try:
+            output = self._run_matlab(matlab_code)
+            elapsed = int((time.time() - start) * 1000)
+            return self._parse_compute_output(output, elapsed)
+        except subprocess.TimeoutExpired:
+            elapsed = int((time.time() - start) * 1000)
+            return ComputeResult(
+                engine=self.name, success=False,
+                error=f"MATLAB timed out after {self.timeout}s",
+                error_code="TIMEOUT",
+                time_ms=elapsed,
+            )
+        except Exception as e:
+            elapsed = int((time.time() - start) * 1000)
+            return ComputeResult(
+                engine=self.name, success=False,
+                error=f"MATLAB error: {e}",
+                error_code="ENGINE_ERROR",
+                time_ms=elapsed,
+            )
+
+    def _build_compute_code(self, template: str, inputs: dict[str, str]) -> str:
+        """Generate MATLAB script for a compute template."""
+        header = "syms x y z t real;\n"
+
+        if template == "evaluate":
+            expr = inputs["expression"]
+            return (
+                header
+                + f"result = eval('{expr}');\n"
+                + "disp(['MATLAB_RESULT:', char(string(result))]);\n"
+            )
+        elif template == "simplify":
+            expr = inputs["expression"]
+            return (
+                header
+                + f"expr = {expr};\n"
+                + "result = simplify(expr);\n"
+                + "disp(['MATLAB_RESULT:', char(result)]);\n"
+            )
+        elif template == "solve":
+            equation = inputs["equation"]
+            variable = inputs.get("variable", "x")
+            return (
+                header
+                + f"expr = {equation};\n"
+                + f"result = solve(expr, {variable});\n"
+                + "disp(['MATLAB_RESULT:', char(result)]);\n"
+            )
+        elif template == "factor":
+            expr = inputs["expression"]
+            return (
+                header
+                + f"expr = {expr};\n"
+                + "result = factor(expr);\n"
+                + "disp(['MATLAB_RESULT:', char(result)]);\n"
+            )
+        else:
+            return f"disp('MATLAB_ERROR:Unknown template: {template}');\n"
+
+    def _parse_compute_output(self, output: str, elapsed: int) -> ComputeResult:
+        """Parse tagged output from MATLAB compute script."""
+        for line in output.split("\n"):
+            line = line.strip()
+            if line.startswith("MATLAB_RESULT:"):
+                value = line[len("MATLAB_RESULT:"):].strip()
+                return ComputeResult(
+                    engine=self.name,
+                    success=True,
+                    time_ms=elapsed,
+                    result={"value": value},
+                    stdout=output,
+                )
+            elif line.startswith("MATLAB_ERROR:"):
+                error_msg = line[len("MATLAB_ERROR:"):].strip()
+                return ComputeResult(
+                    engine=self.name,
+                    success=False,
+                    time_ms=elapsed,
+                    error=error_msg,
+                    error_code="ENGINE_ERROR",
+                    stdout=output,
+                )
+
+        return ComputeResult(
+            engine=self.name,
+            success=False,
+            time_ms=elapsed,
+            error="No result from MATLAB",
+            error_code="ENGINE_ERROR",
+            stdout=output,
+        )
+
+    # -- availability / version --------------------------------------------
 
     def get_version(self) -> str:
         try:
@@ -225,3 +431,12 @@ class MatlabEngine(BaseEngine):
             return "MATLAB (version unknown)"
         except Exception:
             return "MATLAB (unavailable)"
+
+    @property
+    def capabilities(self) -> list[Capability]:
+        return [Capability.VALIDATE, Capability.COMPUTE]
+
+    @classmethod
+    def available_templates(cls) -> dict[str, str]:
+        """Return template name -> description mapping."""
+        return {k: v["description"] for k, v in _TEMPLATES.items()}

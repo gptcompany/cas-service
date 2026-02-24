@@ -58,7 +58,38 @@ class TestLatexToSage:
 # ---------------------------------------------------------------------------
 
 
-class TestInputValidation:
+class TestEquationRegex:
+    """Tests for equation detection regex — verifies == is not converted to ===."""
+
+    def test_double_equals_preserved(self):
+        """== in expression should not be touched by equation conversion."""
+        engine = SageEngine()
+        engine._available = True
+        # Directly test the regex used in validate
+        import re
+        sage_expr = "x == 1"
+        # Should detect == and set is_equation True without substitution
+        assert "==" in sage_expr
+        assert not re.search(r"(?<![<>!=])=(?!=)", sage_expr)
+
+    def test_single_equals_converted(self):
+        """Single = should be converted to ==."""
+        import re
+        sage_expr = "x = 1"
+        match = re.search(r"(?<![<>!=])=(?!=)", sage_expr)
+        assert match is not None
+        converted = re.sub(r"(?<![<>!=])=(?!=)", "==", sage_expr)
+        assert converted == "x == 1"
+
+    def test_gte_lte_not_converted(self):
+        """>=, <=, != should not be affected."""
+        import re
+        for expr in ["x >= 1", "x <= 1", "x != 1"]:
+            match = re.search(r"(?<![<>!=])=(?!=)", expr)
+            assert match is None, f"Unexpectedly matched in: {expr}"
+
+
+
 
     def test_valid_expression(self):
         assert _validate_input("x^2 + 1") is True

@@ -80,6 +80,9 @@ class BaseEngine(ABC):
         """Return engine version string."""
         return "unknown"
 
+    def cleanup(self) -> None:
+        """Clean up engine resources. Called during service shutdown."""
+
     @property
     def capabilities(self) -> list[Capability]:
         """Return list of capabilities this engine supports."""

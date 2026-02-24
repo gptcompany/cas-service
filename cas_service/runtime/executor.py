@@ -46,6 +46,7 @@ class ExecResult:
     stderr: str
     time_ms: int
     timed_out: bool = False
+    truncated: bool = False
 
 
 @dataclass
@@ -109,11 +110,13 @@ class SubprocessExecutor:
                 timeout=timeout,
             )
             elapsed = int((time.time() - start) * 1000)
+            was_truncated = len(proc.stdout) > cap or len(proc.stderr) > cap
             return ExecResult(
                 returncode=proc.returncode,
                 stdout=proc.stdout[:cap],
                 stderr=proc.stderr[:cap],
                 time_ms=elapsed,
+                truncated=was_truncated,
             )
         except subprocess.TimeoutExpired:
             elapsed = int((time.time() - start) * 1000)
