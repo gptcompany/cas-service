@@ -1,7 +1,7 @@
 """CAS Microservice — HTTP handler for LaTeX formula validation.
 
 Standalone service (separate repo, not shared.server). Provides
-/validate, /health, /status, /engines endpoints using stdlib http.server.
+/validate, /health, /status, /engines, /compute endpoints using stdlib http.server.
 
 Usage:
     python -m cas_service.main
@@ -15,6 +15,8 @@ Environment:
     CAS_SYMPY_TIMEOUT=5        # SymPy parse/simplify timeout (seconds)
     CAS_GAP_PATH=gap           # GAP binary path
     CAS_GAP_TIMEOUT=10         # GAP subprocess timeout (seconds)
+    CAS_SAGE_PATH=sage         # SageMath binary path
+    CAS_SAGE_TIMEOUT=30        # SageMath subprocess timeout (seconds)
     CAS_WOLFRAMALPHA_APPID=    # WolframAlpha API key (optional)
     CAS_WOLFRAMALPHA_TIMEOUT=10 # WolframAlpha request timeout (seconds)
     CAS_LOG_LEVEL=INFO         # Logging level
@@ -28,6 +30,7 @@ import os
 import signal
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
@@ -46,6 +49,9 @@ logger = logging.getLogger(__name__)
 ENGINES: dict[str, Any] = {}
 
 _start_time: float = 0.0
+
+# Thread pool for parallel validation (one thread per engine)
+_validate_pool: ThreadPoolExecutor | None = None
 
 
 class JsonFormatter(logging.Formatter):
@@ -108,21 +114,18 @@ class CASHandler(BaseHTTPRequestHandler):
         start = time.time()
         preprocessed = preprocess_latex(latex)
 
-        results = []
-        for engine_name in engines_requested:
-            engine = ENGINES[engine_name]
-            result = engine.validate(preprocessed)
-            results.append({
-                "engine": result.engine,
-                "success": result.success,
-                "is_valid": result.is_valid,
-                "simplified": result.simplified,
-                "original_parsed": result.original_parsed,
-                "error": result.error,
-                "time_ms": result.time_ms,
-            })
+        # Run engines in parallel via ThreadPoolExecutor
+        results = _validate_parallel(engines_requested, preprocessed)
 
         elapsed = int((time.time() - start) * 1000)
+
+        # Log request
+        successes = sum(1 for r in results if r.get("success"))
+        logger.info(
+            "validate latex=%s engines=%d success=%d time_ms=%d",
+            latex[:50], len(results), successes, elapsed,
+        )
+
         self._send_json({
             "results": results,
             "latex_preprocessed": preprocessed,
@@ -130,10 +133,15 @@ class CASHandler(BaseHTTPRequestHandler):
         })
 
     def _handle_health(self) -> None:
+        available_count = sum(
+            1 for e in ENGINES.values() if e.is_available()
+        )
         self._send_json({
             "status": "ok",
             "service": "cas-service",
             "uptime_seconds": round(time.time() - _start_time, 1),
+            "engines_total": len(ENGINES),
+            "engines_available": available_count,
         })
 
     def _handle_status(self) -> None:
@@ -149,7 +157,7 @@ class CASHandler(BaseHTTPRequestHandler):
 
         self._send_json({
             "service": "cas-service",
-            "version": "0.1.0",
+            "version": "0.2.0",
             "uptime_seconds": round(time.time() - _start_time, 1),
             "engines": engines_info,
         })
@@ -218,6 +226,7 @@ class CASHandler(BaseHTTPRequestHandler):
             )
             return
 
+        start = time.time()
         request = ComputeRequest(
             engine=engine_name,
             task_type=task_type,
@@ -226,6 +235,13 @@ class CASHandler(BaseHTTPRequestHandler):
             timeout_s=int(timeout_s),
         )
         result = engine.compute(request)
+        elapsed = int((time.time() - start) * 1000)
+
+        # Log request
+        logger.info(
+            "compute engine=%s template=%s success=%s time_ms=%d",
+            engine_name, template, result.success, elapsed,
+        )
 
         self._send_json({
             "engine": result.engine,
@@ -244,6 +260,7 @@ class CASHandler(BaseHTTPRequestHandler):
             entry: dict[str, Any] = {
                 "name": name,
                 "available": engine.is_available(),
+                "version": engine.get_version(),
                 "capabilities": [c.value for c in engine.capabilities],
                 "description": engine.__class__.__doc__ or "",
             }
@@ -284,40 +301,128 @@ class CASHandler(BaseHTTPRequestHandler):
         logger.info("%s %s", self.client_address[0], format % args)
 
 
+def _validate_parallel(
+    engine_names: list[str], preprocessed: str,
+) -> list[dict[str, Any]]:
+    """Run validation across multiple engines in parallel.
+
+    Each engine runs in its own thread. Results are returned in the
+    same order as engine_names.
+    """
+    if len(engine_names) <= 1 or _validate_pool is None:
+        # Single engine or no pool: run sequentially
+        results = []
+        for name in engine_names:
+            result = _validate_one(name, preprocessed)
+            results.append(result)
+        return results
+
+    # Submit all engines to thread pool
+    future_to_name = {}
+    for name in engine_names:
+        future = _validate_pool.submit(_validate_one, name, preprocessed)
+        future_to_name[future] = name
+
+    # Collect results preserving original order
+    result_map: dict[str, dict] = {}
+    for future in as_completed(future_to_name):
+        name = future_to_name[future]
+        try:
+            result_map[name] = future.result()
+        except Exception as exc:
+            logger.exception("Engine %s raised exception during validation", name)
+            result_map[name] = {
+                "engine": name,
+                "success": False,
+                "is_valid": None,
+                "simplified": None,
+                "original_parsed": None,
+                "error": str(exc),
+                "time_ms": 0,
+            }
+
+    return [result_map[name] for name in engine_names]
+
+
+def _validate_one(engine_name: str, preprocessed: str) -> dict[str, Any]:
+    """Validate with a single engine, catching any exception."""
+    engine = ENGINES[engine_name]
+    try:
+        result = engine.validate(preprocessed)
+        return {
+            "engine": result.engine,
+            "success": result.success,
+            "is_valid": result.is_valid,
+            "simplified": result.simplified,
+            "original_parsed": result.original_parsed,
+            "error": result.error,
+            "time_ms": result.time_ms,
+        }
+    except Exception as exc:
+        logger.exception("Engine %s validation error", engine_name)
+        return {
+            "engine": engine_name,
+            "success": False,
+            "is_valid": None,
+            "simplified": None,
+            "original_parsed": None,
+            "error": str(exc),
+            "time_ms": 0,
+        }
+
+
 def _init_engines() -> None:
-    """Initialize engine registry."""
-    global ENGINES
+    """Initialize engine registry with graceful per-engine failure handling."""
+    global ENGINES, _validate_pool
 
-    sympy_timeout = int(os.environ.get("CAS_SYMPY_TIMEOUT", "5"))
-    maxima_path = os.environ.get("CAS_MAXIMA_PATH", "/usr/bin/maxima")
-    maxima_timeout = int(os.environ.get("CAS_MAXIMA_TIMEOUT", "10"))
-    matlab_path = os.environ.get("CAS_MATLAB_PATH", "matlab")
-    matlab_timeout = int(os.environ.get("CAS_MATLAB_TIMEOUT", "30"))
-    gap_path = os.environ.get("CAS_GAP_PATH", "gap")
-    gap_timeout = int(os.environ.get("CAS_GAP_TIMEOUT", "10"))
-    sage_path = os.environ.get("CAS_SAGE_PATH", "sage")
-    sage_timeout = int(os.environ.get("CAS_SAGE_TIMEOUT", "30"))
-    wa_app_id = os.environ.get("CAS_WOLFRAMALPHA_APPID", "")
-    wa_timeout = int(os.environ.get("CAS_WOLFRAMALPHA_TIMEOUT", "10"))
+    engine_configs = [
+        ("sympy", lambda: SympyEngine(
+            timeout=int(os.environ.get("CAS_SYMPY_TIMEOUT", "5")),
+        )),
+        ("maxima", lambda: MaximaEngine(
+            maxima_path=os.environ.get("CAS_MAXIMA_PATH", "/usr/bin/maxima"),
+            timeout=int(os.environ.get("CAS_MAXIMA_TIMEOUT", "10")),
+        )),
+        ("matlab", lambda: MatlabEngine(
+            matlab_path=os.environ.get("CAS_MATLAB_PATH", "matlab"),
+            timeout=int(os.environ.get("CAS_MATLAB_TIMEOUT", "30")),
+        )),
+        ("gap", lambda: GapEngine(
+            gap_path=os.environ.get("CAS_GAP_PATH", "gap"),
+            timeout=int(os.environ.get("CAS_GAP_TIMEOUT", "10")),
+        )),
+        ("sage", lambda: SageEngine(
+            sage_path=os.environ.get("CAS_SAGE_PATH", "sage"),
+            timeout=int(os.environ.get("CAS_SAGE_TIMEOUT", "30")),
+        )),
+        ("wolframalpha", lambda: WolframAlphaEngine(
+            app_id=os.environ.get("CAS_WOLFRAMALPHA_APPID", ""),
+            timeout=int(os.environ.get("CAS_WOLFRAMALPHA_TIMEOUT", "10")),
+        )),
+    ]
 
-    sympy_engine = SympyEngine(timeout=sympy_timeout)
-    maxima_engine = MaximaEngine(maxima_path=maxima_path, timeout=maxima_timeout)
-    matlab_engine = MatlabEngine(matlab_path=matlab_path, timeout=matlab_timeout)
-    gap_engine = GapEngine(gap_path=gap_path, timeout=gap_timeout)
-    sage_engine = SageEngine(sage_path=sage_path, timeout=sage_timeout)
-    wa_engine = WolframAlphaEngine(app_id=wa_app_id, timeout=wa_timeout)
+    for name, factory in engine_configs:
+        try:
+            engine = factory()
+            ENGINES[name] = engine
+            available = engine.is_available()
+            version = engine.get_version()
+            logger.info(
+                "Engine %s: available=%s version=%s", name, available, version,
+            )
+        except Exception:
+            logger.exception("Failed to initialize engine %s — skipping", name)
 
-    ENGINES["sympy"] = sympy_engine
-    ENGINES["maxima"] = maxima_engine
-    ENGINES["matlab"] = matlab_engine
-    ENGINES["gap"] = gap_engine
-    ENGINES["sage"] = sage_engine
-    ENGINES["wolframalpha"] = wa_engine
+    available_count = sum(1 for e in ENGINES.values() if e.is_available())
+    logger.info(
+        "Initialized %d engines (%d available)", len(ENGINES), available_count,
+    )
 
-    for name, engine in ENGINES.items():
-        available = engine.is_available()
-        version = engine.get_version()
-        logger.info("Engine %s: available=%s version=%s", name, available, version)
+    # Create thread pool sized to number of engines
+    _validate_pool = ThreadPoolExecutor(
+        max_workers=max(len(ENGINES), 2),
+        thread_name_prefix="cas-validate",
+    )
 
 
 def main() -> None:
@@ -352,6 +457,8 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        if _validate_pool:
+            _validate_pool.shutdown(wait=False)
         server.server_close()
         logger.info("CAS service stopped")
 
