@@ -373,8 +373,11 @@ class MatlabEngine(BaseEngine):
             expr_literal = _matlab_single_quoted(expr)
             return (
                 header
-                + f"expr = {expr_literal};\n"
-                + "result = eval(expr);\n"
+                + f"expr = str2sym({expr_literal});\n"
+                + "result = simplify(expr);\n"
+                + "if isempty(symvar(result))\n"
+                + "    result = vpa(result);\n"
+                + "end\n"
                 + "disp(['MATLAB_RESULT:', char(string(result))]);\n"
             )
         elif template == "simplify":

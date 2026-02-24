@@ -9,7 +9,7 @@ import urllib.request
 from rich.console import Console
 from rich.table import Table
 
-SERVICE_URL = "http://localhost:8769"
+from cas_service.setup._config import get_service_url
 
 # Smoke test payloads per engine type
 _VALIDATE_SMOKE = {
@@ -41,11 +41,12 @@ class VerifyStep:
 
     def install(self, console: Console) -> bool:
         """Hit /health, /engines, and run validate + compute smoke tests."""
-        console.print(f"  Checking {SERVICE_URL}/health ...")
+        service_url = get_service_url()
+        console.print(f"  Checking {service_url}/health ...")
         health = self._get_json("/health")
         if health is None:
             console.print(
-                f"  [red]Cannot reach {SERVICE_URL}[/] — is the service running?"
+                f"  [red]Cannot reach {service_url}[/] — is the service running?"
             )
             console.print()
             console.print("  Start it with:")
@@ -58,7 +59,7 @@ class VerifyStep:
         uptime = health.get("uptime_seconds", "?")
         console.print(f"  Health: [green]{status}[/]  Uptime: {uptime}s")
 
-        console.print(f"  Checking {SERVICE_URL}/engines ...")
+        console.print(f"  Checking {service_url}/engines ...")
         engines_data = self._get_json("/engines")
         if engines_data is None:
             console.print("  [yellow]Could not fetch /engines[/]")
@@ -125,7 +126,7 @@ class VerifyStep:
                 }
             ).encode()
             req = urllib.request.Request(
-                f"{SERVICE_URL}/validate",
+                f"{get_service_url()}/validate",
                 data=payload,
                 headers={
                     "Content-Type": "application/json",
@@ -170,7 +171,7 @@ class VerifyStep:
                 }
             ).encode()
             req = urllib.request.Request(
-                f"{SERVICE_URL}/compute",
+                f"{get_service_url()}/compute",
                 data=payload,
                 headers={
                     "Content-Type": "application/json",
@@ -207,7 +208,7 @@ class VerifyStep:
         """GET a JSON endpoint, return parsed dict or None."""
         try:
             req = urllib.request.Request(
-                f"{SERVICE_URL}{path}",
+                f"{get_service_url()}{path}",
                 headers={"Accept": "application/json"},
             )
             with urllib.request.urlopen(req, timeout=5) as resp:

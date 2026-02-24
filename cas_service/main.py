@@ -36,6 +36,7 @@ from cas_service.engines.sage_engine import SageEngine
 from cas_service.engines.sympy_engine import SympyEngine
 from cas_service.engines.wolframalpha_engine import WolframAlphaEngine
 from cas_service.preprocessing import preprocess_latex
+from cas_service.setup._config import DEFAULT_CAS_PORT
 
 logger = logging.getLogger(__name__)
 
@@ -522,7 +523,7 @@ def main() -> None:
 
     _init_engines()
 
-    port = int(os.environ.get("CAS_PORT", "8769"))
+    port = int(os.environ.get("CAS_PORT", str(DEFAULT_CAS_PORT)))
     _start_time = time.time()
 
     server = HTTPServer(("0.0.0.0", port), CASHandler)

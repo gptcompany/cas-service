@@ -218,8 +218,9 @@ class TestMatlabComputeMocked:
     def test_evaluate_escapes_single_quotes_in_generated_code(self):
         engine = MatlabEngine()
         code = engine._build_compute_code("evaluate", {"expression": "A'+1"})
-        assert "expr = 'A''+1';" in code
-        assert "result = eval(expr);" in code
+        assert "expr = str2sym('A''+1');" in code
+        assert "result = simplify(expr);" in code
+        assert "result = eval(" not in code
 
 
 # ---------------------------------------------------------------------------

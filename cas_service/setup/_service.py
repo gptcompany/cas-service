@@ -11,6 +11,8 @@ from rich.console import Console
 
 from pathlib import Path
 
+from cas_service.setup._config import DEFAULT_CAS_PORT
+
 PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 UNIT_FILE_SRC = os.path.join(PROJECT_ROOT, "cas-service.service")
 UNIT_FILE_DST = "/etc/systemd/system/cas-service.service"
@@ -237,7 +239,7 @@ class ServiceStep:
         )
         console.print()
         console.print("  Environment variables (optional):")
-        console.print("    CAS_PORT=8769")
+        console.print(f"    CAS_PORT={DEFAULT_CAS_PORT}")
         console.print("    CAS_SAGE_PATH=sage")
         console.print(
             "    CAS_WOLFRAMALPHA_APPID=<your-appid>  # optional remote engine"
