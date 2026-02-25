@@ -71,6 +71,9 @@ class ServiceStep:
             "How do you want to run the CAS service?",
             choices=choices,
         ).ask()
+        if self._mode is None:
+            console.print("  [yellow]Selection cancelled.[/]")
+            return False
 
         if self._mode and self._mode.startswith("systemd"):
             return self._install_systemd(console)

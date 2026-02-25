@@ -401,6 +401,42 @@ class TestSympyStep:
 
 
 # ===========================================================================
+# SageStep
+# ===========================================================================
+
+
+class TestSageStep:
+    def _make(self):
+        from cas_service.setup._sage import SageStep
+
+        return SageStep()
+
+    @patch("cas_service.setup._sage.os.access")
+    @patch("cas_service.setup._sage.os.path.isfile")
+    @patch(
+        "cas_service.setup._sage.glob.glob",
+        return_value=["/media/sam/3TB-WDC/apps/sage/sage"],
+    )
+    @patch("cas_service.setup._sage.shutil.which", side_effect=[None, None])
+    @patch("cas_service.setup._sage.get_key", return_value=None)
+    def test_find_sage_via_media_glob(
+        self,
+        mock_get_key,
+        mock_which,
+        mock_glob,
+        mock_isfile,
+        mock_access,
+    ):
+        """_find_sage() supports external-drive layouts under /media/.../apps."""
+        mock_isfile.side_effect = lambda p: p == "/media/sam/3TB-WDC/apps/sage/sage"
+        mock_access.side_effect = (
+            lambda p, mode: p == "/media/sam/3TB-WDC/apps/sage/sage"
+        )
+        step = self._make()
+        assert step._find_sage() == "/media/sam/3TB-WDC/apps/sage/sage"
+
+
+# ===========================================================================
 # ServiceStep
 # ===========================================================================
 
@@ -520,6 +556,13 @@ class TestServiceStep:
         mock_q.select.return_value.ask.return_value = "foreground"
         step = self._make()
         assert step.install(_console()) is True
+
+    @patch("cas_service.setup._service.questionary")
+    def test_install_selection_cancelled(self, mock_q):
+        """install() returns False when user cancels mode selection."""
+        mock_q.select.return_value.ask.return_value = None
+        step = self._make()
+        assert step.install(_console()) is False
 
     # -- verify --------------------------------------------------------------
 
@@ -740,6 +783,17 @@ class TestRunner:
         step.install.assert_not_called()
 
     @patch("cas_service.setup._runner.questionary")
+    def test_user_cancels_confirm_aborts(self, mock_q):
+        """run_steps returns False when user cancels the confirm prompt."""
+        from cas_service.setup._runner import run_steps
+
+        mock_q.confirm.return_value.ask.return_value = None
+        step = self._make_step("MATLAB", check=False)
+        result = run_steps([step], _console())
+        assert result is False
+        step.install.assert_not_called()
+
+    @patch("cas_service.setup._runner.questionary")
     def test_install_fails_user_aborts(self, mock_q):
         """run_steps returns False when install fails and user aborts."""
         from cas_service.setup._runner import run_steps
@@ -760,6 +814,17 @@ class TestRunner:
         step = self._make_step("MATLAB", check=False, install=False)
         result = run_steps([step], _console())
         assert result is True  # skipped, not failed
+
+    @patch("cas_service.setup._runner.questionary")
+    def test_install_fails_prompt_cancel_aborts(self, mock_q):
+        """run_steps returns False when retry/skip/abort prompt is cancelled."""
+        from cas_service.setup._runner import run_steps
+
+        mock_q.confirm.return_value.ask.return_value = True
+        mock_q.select.return_value.ask.return_value = None
+        step = self._make_step("MATLAB", check=False, install=False)
+        result = run_steps([step], _console())
+        assert result is False
 
     @patch("cas_service.setup._runner.questionary")
     def test_install_fails_retry_succeeds(self, mock_q):

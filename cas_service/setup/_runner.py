@@ -26,7 +26,11 @@ def run_steps(steps: list[SetupStep], console: Console) -> bool:
                 console.print(f"  [green]ok[/] {step.name} — already configured")
                 results.append((step.name, "ok"))
                 continue
-        if not questionary.confirm(f"Configure {step.name}?", default=True).ask():
+        confirm = questionary.confirm(f"Configure {step.name}?", default=True).ask()
+        if confirm is None:
+            console.print("[bold red]Setup cancelled.[/]")
+            return False
+        if not confirm:
             console.print(f"  [yellow]skip[/] {step.name} — skipped")
             results.append((step.name, "skipped"))
             continue
@@ -36,6 +40,9 @@ def run_steps(steps: list[SetupStep], console: Console) -> bool:
                 f"{step.name} failed. What to do?",
                 choices=["Skip and continue", "Retry", "Abort"],
             ).ask()
+            if action is None:
+                console.print("[bold red]Setup cancelled.[/]")
+                return False
             if action == "Abort":
                 console.print("[bold red]Setup aborted.[/]")
                 return False

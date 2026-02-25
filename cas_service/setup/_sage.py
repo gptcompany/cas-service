@@ -19,6 +19,14 @@ _SEARCH_PATHS = [
     "/opt/homebrew/bin/sage",
     "/Applications/SageMath/sage",
     "/Applications/SageMath-*/sage",
+    "/media/*/sage",
+    "/media/*/*/sage",
+    "/media/*/sagemath*/sage",
+    "/media/*/*/sagemath*/sage",
+    "/media/*/apps/sage*/sage",
+    "/media/*/*/apps/sage*/sage",
+    "/media/*/SageMath*/sage",
+    "/media/*/*/SageMath*/sage",
 ]
 
 
