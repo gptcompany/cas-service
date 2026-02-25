@@ -49,7 +49,10 @@ class WolframAlphaEngine(BaseEngine):
     name = "wolframalpha"
 
     def __init__(self, app_id: str | None = None, timeout: int = 10) -> None:
-        self._app_id = app_id or os.environ.get("CAS_WOLFRAMALPHA_APPID", "")
+        if app_id is None:
+            self._app_id = os.environ.get("CAS_WOLFRAMALPHA_APPID", "")
+        else:
+            self._app_id = app_id
         self.timeout = timeout
 
     def validate(self, latex: str) -> EngineResult:
@@ -82,9 +85,7 @@ class WolframAlphaEngine(BaseEngine):
                 time_ms=int((time.time() - start) * 1000),
             )
 
-        missing = [
-            k for k in tmpl["required_inputs"] if k not in request.inputs
-        ]
+        missing = [k for k in tmpl["required_inputs"] if k not in request.inputs]
         if missing:
             return ComputeResult(
                 engine=self.name,
@@ -99,16 +100,22 @@ class WolframAlphaEngine(BaseEngine):
         return self._call_api(query, timeout_s, start)
 
     def _call_api(
-        self, query: str, timeout_s: int, start: float,
+        self,
+        query: str,
+        timeout_s: int,
+        start: float,
     ) -> ComputeResult:
         """Call the WolframAlpha Full Results API."""
-        params = urllib.parse.urlencode({
-            "input": query,
-            "appid": self._app_id,
-            "format": "plaintext",
-            "output": "json",
-        })
-        url = f"{_WA_API_URL}?{params}"
+        params = urllib.parse.urlencode(
+            {
+                "input": query,
+                "appid": self._app_id,
+                "format": "plaintext",
+                "output": "json",
+            }
+        )
+        api_url = os.environ.get("CAS_WOLFRAMALPHA_API_URL", _WA_API_URL)
+        url = f"{api_url}?{params}"
 
         try:
             req = urllib.request.Request(url, method="GET")
@@ -122,26 +129,34 @@ class WolframAlphaEngine(BaseEngine):
             elapsed = int((time.time() - start) * 1000)
             if exc.code == 403:
                 return ComputeResult(
-                    engine=self.name, success=False, time_ms=elapsed,
+                    engine=self.name,
+                    success=False,
+                    time_ms=elapsed,
                     error="WolframAlpha API: invalid or expired AppID",
                     error_code="AUTH_ERROR",
                 )
             return ComputeResult(
-                engine=self.name, success=False, time_ms=elapsed,
+                engine=self.name,
+                success=False,
+                time_ms=elapsed,
                 error=f"WolframAlpha API HTTP {exc.code}",
                 error_code="REMOTE_ERROR",
             )
         except urllib.error.URLError as exc:
             elapsed = int((time.time() - start) * 1000)
             return ComputeResult(
-                engine=self.name, success=False, time_ms=elapsed,
+                engine=self.name,
+                success=False,
+                time_ms=elapsed,
                 error=f"Network error: {exc.reason}",
                 error_code="NETWORK_ERROR",
             )
         except TimeoutError:
             elapsed = int((time.time() - start) * 1000)
             return ComputeResult(
-                engine=self.name, success=False, time_ms=elapsed,
+                engine=self.name,
+                success=False,
+                time_ms=elapsed,
                 error=f"WolframAlpha timed out after {timeout_s}s",
                 error_code="TIMEOUT",
             )
@@ -149,20 +164,26 @@ class WolframAlphaEngine(BaseEngine):
             logger.exception("WolframAlpha API error")
             elapsed = int((time.time() - start) * 1000)
             return ComputeResult(
-                engine=self.name, success=False, time_ms=elapsed,
+                engine=self.name,
+                success=False,
+                time_ms=elapsed,
                 error=str(exc),
                 error_code="REMOTE_ERROR",
             )
 
     def _parse_response(
-        self, data: dict, elapsed: int,
+        self,
+        data: dict,
+        elapsed: int,
     ) -> ComputeResult:
         """Extract result from WolframAlpha JSON response."""
         queryresult = data.get("queryresult", {})
 
         if not queryresult.get("success"):
             return ComputeResult(
-                engine=self.name, success=False, time_ms=elapsed,
+                engine=self.name,
+                success=False,
+                time_ms=elapsed,
                 error="WolframAlpha could not interpret the query",
                 error_code="QUERY_FAILED",
                 stdout=json.dumps(queryresult.get("tips", {})),
@@ -189,7 +210,9 @@ class WolframAlphaEngine(BaseEngine):
 
         if not result_text:
             return ComputeResult(
-                engine=self.name, success=False, time_ms=elapsed,
+                engine=self.name,
+                success=False,
+                time_ms=elapsed,
                 error="No result found in WolframAlpha response",
                 error_code="NO_RESULT",
             )

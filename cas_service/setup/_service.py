@@ -11,6 +11,8 @@ from rich.console import Console
 
 from pathlib import Path
 
+from cas_service.setup._config import DEFAULT_CAS_PORT
+
 PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 UNIT_FILE_SRC = os.path.join(PROJECT_ROOT, "cas-service.service")
 UNIT_FILE_DST = "/etc/systemd/system/cas-service.service"
@@ -60,8 +62,7 @@ class ServiceStep:
         if len(choices) == 1:
             # Only foreground available
             console.print(
-                "  [dim]systemd and Docker not available "
-                "— using foreground mode.[/]"
+                "  [dim]systemd and Docker not available — using foreground mode.[/]"
             )
             self._mode = "foreground"
             return self._show_foreground(console)
@@ -70,6 +71,9 @@ class ServiceStep:
             "How do you want to run the CAS service?",
             choices=choices,
         ).ask()
+        if self._mode is None:
+            console.print("  [yellow]Selection cancelled.[/]")
+            return False
 
         if self._mode and self._mode.startswith("systemd"):
             return self._install_systemd(console)
@@ -178,8 +182,15 @@ class ServiceStep:
         if has_dotenvx and has_env:
             console.print("  Starting with dotenvx (decrypted .env)...")
             cmd = [
-                "dotenvx", "run", "-f", env_file, "--",
-                "docker", "compose", "up", "-d",
+                "dotenvx",
+                "run",
+                "-f",
+                env_file,
+                "--",
+                "docker",
+                "compose",
+                "up",
+                "-d",
             ]
         else:
             if has_env and not has_dotenvx:
@@ -187,9 +198,7 @@ class ServiceStep:
                     "  [yellow]dotenvx not found — .env won't be decrypted "
                     "automatically.[/]"
                 )
-                console.print(
-                    "  [dim]Install dotenvx or pass env vars manually.[/]"
-                )
+                console.print("  [dim]Install dotenvx or pass env vars manually.[/]")
             console.print("  Starting container...")
             cmd = ["docker", "compose", "up", "-d"]
 
@@ -233,9 +242,11 @@ class ServiceStep:
         )
         console.print()
         console.print("  Environment variables (optional):")
-        console.print("    CAS_PORT=8769")
+        console.print(f"    CAS_PORT={DEFAULT_CAS_PORT}")
         console.print("    CAS_SAGE_PATH=sage")
-        console.print("    CAS_WOLFRAMALPHA_APPID=<your-appid>  # optional remote engine")
+        console.print(
+            "    CAS_WOLFRAMALPHA_APPID=<your-appid>  # optional remote engine"
+        )
         console.print("    CAS_LOG_LEVEL=INFO")
         console.print()
         return True

@@ -36,6 +36,7 @@ from cas_service.engines.sage_engine import SageEngine
 from cas_service.engines.sympy_engine import SympyEngine
 from cas_service.engines.wolframalpha_engine import WolframAlphaEngine
 from cas_service.preprocessing import preprocess_latex
+from cas_service.setup._config import DEFAULT_CAS_PORT
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +109,8 @@ class CASHandler(BaseHTTPRequestHandler):
             engines_requested = engines_explicit
         elif consensus:
             engines_requested = [
-                n for n, e in ENGINES.items()
+                n
+                for n, e in ENGINES.items()
                 if Capability.VALIDATE in e.capabilities and e.is_available()
             ]
         else:
@@ -116,13 +118,16 @@ class CASHandler(BaseHTTPRequestHandler):
                 engines_requested = [_default_engine]
             else:
                 engines_requested = [
-                    n for n, e in ENGINES.items()
+                    n
+                    for n, e in ENGINES.items()
                     if Capability.VALIDATE in e.capabilities and e.is_available()
                 ]
 
         if not engines_requested:
             self._send_error(
-                "No validation engines available", "NO_ENGINES", 503,
+                "No validation engines available",
+                "NO_ENGINES",
+                503,
             )
             return
 
@@ -130,7 +135,8 @@ class CASHandler(BaseHTTPRequestHandler):
         if unknown:
             self._send_error(
                 f"Unknown engine: {', '.join(unknown)}",
-                "UNKNOWN_ENGINE", 422,
+                "UNKNOWN_ENGINE",
+                422,
                 {"available": list(ENGINES.keys())},
             )
             return
@@ -147,27 +153,33 @@ class CASHandler(BaseHTTPRequestHandler):
         successes = sum(1 for r in results if r.get("success"))
         logger.info(
             "validate latex=%s engines=%d success=%d time_ms=%d consensus=%s",
-            latex[:50], len(results), successes, elapsed, consensus,
+            latex[:50],
+            len(results),
+            successes,
+            elapsed,
+            consensus,
         )
 
-        self._send_json({
-            "results": results,
-            "consensus": consensus,
-            "latex_preprocessed": preprocessed,
-            "time_ms": elapsed,
-        })
+        self._send_json(
+            {
+                "results": results,
+                "consensus": consensus,
+                "latex_preprocessed": preprocessed,
+                "time_ms": elapsed,
+            }
+        )
 
     def _handle_health(self) -> None:
-        available_count = sum(
-            1 for e in ENGINES.values() if e.is_available()
+        available_count = sum(1 for e in ENGINES.values() if e.is_available())
+        self._send_json(
+            {
+                "status": "ok",
+                "service": "cas-service",
+                "uptime_seconds": round(time.time() - _start_time, 1),
+                "engines_total": len(ENGINES),
+                "engines_available": available_count,
+            }
         )
-        self._send_json({
-            "status": "ok",
-            "service": "cas-service",
-            "uptime_seconds": round(time.time() - _start_time, 1),
-            "engines_total": len(ENGINES),
-            "engines_available": available_count,
-        })
 
     def _handle_status(self) -> None:
         engines_info = {}
@@ -178,13 +190,15 @@ class CASHandler(BaseHTTPRequestHandler):
             }
             engines_info[name] = info
 
-        self._send_json({
-            "service": "cas-service",
-            "version": "0.3.0",
-            "uptime_seconds": round(time.time() - _start_time, 1),
-            "default_engine": _default_engine,
-            "engines": engines_info,
-        })
+        self._send_json(
+            {
+                "service": "cas-service",
+                "version": "0.3.0",
+                "uptime_seconds": round(time.time() - _start_time, 1),
+                "default_engine": _default_engine,
+                "engines": engines_info,
+            }
+        )
 
     def _handle_compute(self) -> None:
         data = self._read_json()
@@ -194,14 +208,17 @@ class CASHandler(BaseHTTPRequestHandler):
         engine_name = data.get("engine")
         if not engine_name:
             self._send_error(
-                "engine field is required", "INVALID_REQUEST", 400,
+                "engine field is required",
+                "INVALID_REQUEST",
+                400,
             )
             return
 
         if engine_name not in ENGINES:
             self._send_error(
                 f"Unknown engine: {engine_name}",
-                "UNKNOWN_ENGINE", 422,
+                "UNKNOWN_ENGINE",
+                422,
                 {"available": list(ENGINES.keys())},
             )
             return
@@ -210,28 +227,35 @@ class CASHandler(BaseHTTPRequestHandler):
         if task_type != "template":
             self._send_error(
                 "task_type must be 'template'",
-                "INVALID_REQUEST", 400,
+                "INVALID_REQUEST",
+                400,
             )
             return
 
         template = data.get("template")
         if not template:
             self._send_error(
-                "template field is required", "INVALID_REQUEST", 400,
+                "template field is required",
+                "INVALID_REQUEST",
+                400,
             )
             return
 
         inputs = data.get("inputs", {})
         if not isinstance(inputs, dict):
             self._send_error(
-                "inputs must be an object", "INVALID_REQUEST", 400,
+                "inputs must be an object",
+                "INVALID_REQUEST",
+                400,
             )
             return
 
         timeout_s = data.get("timeout_s", 5)
         if not isinstance(timeout_s, (int, float)) or timeout_s <= 0:
             self._send_error(
-                "timeout_s must be a positive number", "INVALID_REQUEST", 400,
+                "timeout_s must be a positive number",
+                "INVALID_REQUEST",
+                400,
             )
             return
 
@@ -239,14 +263,16 @@ class CASHandler(BaseHTTPRequestHandler):
         if Capability.COMPUTE not in engine.capabilities:
             self._send_error(
                 f"Engine '{engine_name}' does not support compute",
-                "NOT_IMPLEMENTED", 400,
+                "NOT_IMPLEMENTED",
+                400,
             )
             return
 
         if not engine.is_available():
             self._send_error(
                 f"Engine '{engine_name}' is not available",
-                "ENGINE_UNAVAILABLE", 503,
+                "ENGINE_UNAVAILABLE",
+                503,
             )
             return
 
@@ -264,19 +290,24 @@ class CASHandler(BaseHTTPRequestHandler):
         # Log request
         logger.info(
             "compute engine=%s template=%s success=%s time_ms=%d",
-            engine_name, template, result.success, elapsed,
+            engine_name,
+            template,
+            result.success,
+            elapsed,
         )
 
-        self._send_json({
-            "engine": result.engine,
-            "success": result.success,
-            "time_ms": result.time_ms,
-            "result": result.result,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "error": result.error,
-            "error_code": result.error_code,
-        })
+        self._send_json(
+            {
+                "engine": result.engine,
+                "success": result.success,
+                "time_ms": result.time_ms,
+                "result": result.result,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "error": result.error,
+                "error_code": result.error_code,
+            }
+        )
 
     def _handle_engines(self) -> None:
         engine_list = []
@@ -302,8 +333,9 @@ class CASHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_error(self, error: str, code: str, status: int = 400,
-                    details: dict | None = None) -> None:
+    def _send_error(
+        self, error: str, code: str, status: int = 400, details: dict | None = None
+    ) -> None:
         response: dict[str, Any] = {"error": error, "code": code}
         if details:
             response["details"] = details
@@ -326,7 +358,8 @@ class CASHandler(BaseHTTPRequestHandler):
 
 
 def _validate_parallel(
-    engine_names: list[str], preprocessed: str,
+    engine_names: list[str],
+    preprocessed: str,
 ) -> list[dict[str, Any]]:
     """Run validation across multiple engines in parallel.
 
@@ -400,21 +433,33 @@ def _init_engines() -> None:
     global ENGINES, _validate_pool, _default_engine
 
     engine_configs = [
-        ("sympy", lambda: SympyEngine(
-            timeout=int(os.environ.get("CAS_SYMPY_TIMEOUT", "5")),
-        )),
-        ("matlab", lambda: MatlabEngine(
-            matlab_path=os.environ.get("CAS_MATLAB_PATH", "matlab"),
-            timeout=int(os.environ.get("CAS_MATLAB_TIMEOUT", "30")),
-        )),
-        ("sage", lambda: SageEngine(
-            sage_path=os.environ.get("CAS_SAGE_PATH", "sage"),
-            timeout=int(os.environ.get("CAS_SAGE_TIMEOUT", "30")),
-        )),
-        ("wolframalpha", lambda: WolframAlphaEngine(
-            app_id=os.environ.get("CAS_WOLFRAMALPHA_APPID", ""),
-            timeout=int(os.environ.get("CAS_WOLFRAMALPHA_TIMEOUT", "10")),
-        )),
+        (
+            "sympy",
+            lambda: SympyEngine(
+                timeout=int(os.environ.get("CAS_SYMPY_TIMEOUT", "5")),
+            ),
+        ),
+        (
+            "matlab",
+            lambda: MatlabEngine(
+                matlab_path=os.environ.get("CAS_MATLAB_PATH", "matlab"),
+                timeout=int(os.environ.get("CAS_MATLAB_TIMEOUT", "30")),
+            ),
+        ),
+        (
+            "sage",
+            lambda: SageEngine(
+                sage_path=os.environ.get("CAS_SAGE_PATH", "sage"),
+                timeout=int(os.environ.get("CAS_SAGE_TIMEOUT", "30")),
+            ),
+        ),
+        (
+            "wolframalpha",
+            lambda: WolframAlphaEngine(
+                app_id=os.environ.get("CAS_WOLFRAMALPHA_APPID", ""),
+                timeout=int(os.environ.get("CAS_WOLFRAMALPHA_TIMEOUT", "10")),
+            ),
+        ),
     ]
 
     for name, factory in engine_configs:
@@ -424,14 +469,19 @@ def _init_engines() -> None:
             available = engine.is_available()
             version = engine.get_version()
             logger.info(
-                "Engine %s: available=%s version=%s", name, available, version,
+                "Engine %s: available=%s version=%s",
+                name,
+                available,
+                version,
             )
         except Exception:
             logger.exception("Failed to initialize engine %s — skipping", name)
 
     available_count = sum(1 for e in ENGINES.values() if e.is_available())
     logger.info(
-        "Initialized %d engines (%d available)", len(ENGINES), available_count,
+        "Initialized %d engines (%d available)",
+        len(ENGINES),
+        available_count,
     )
 
     # Set default validation engine: env override > sage > sympy > first available
@@ -473,15 +523,17 @@ def main() -> None:
 
     _init_engines()
 
-    port = int(os.environ.get("CAS_PORT", "8769"))
+    port = int(os.environ.get("CAS_PORT", str(DEFAULT_CAS_PORT)))
     _start_time = time.time()
 
     server = HTTPServer(("0.0.0.0", port), CASHandler)
 
     if threading.current_thread() is threading.main_thread():
+
         def sigterm_handler(signum: int, frame: Any) -> None:
             logger.info("SIGTERM received, shutting down...")
             server.shutdown()
+
         signal.signal(signal.SIGTERM, sigterm_handler)
 
     logger.info("CAS service starting on port %d", port)

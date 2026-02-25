@@ -157,7 +157,9 @@ class SubprocessExecutor:
             self._jobs[job_id] = job
 
         thread = threading.Thread(
-            target=self._execute_job, args=(job,), daemon=True,
+            target=self._execute_job,
+            args=(job,),
+            daemon=True,
         )
         thread.start()
         return job_id
@@ -174,8 +176,10 @@ class SubprocessExecutor:
             if job is None:
                 return None
             if job.status in (
-                JobStatus.COMPLETED, JobStatus.FAILED,
-                JobStatus.CANCELLED, JobStatus.TIMEOUT,
+                JobStatus.COMPLETED,
+                JobStatus.FAILED,
+                JobStatus.CANCELLED,
+                JobStatus.TIMEOUT,
             ):
                 return job.result
             time.sleep(poll_interval)
@@ -233,11 +237,18 @@ class SubprocessExecutor:
         if len(self._jobs) < self.max_jobs:
             return
         completed = sorted(
-            (j for j in self._jobs.values() if j.status in (
-                JobStatus.COMPLETED, JobStatus.FAILED,
-                JobStatus.CANCELLED, JobStatus.TIMEOUT,
-            )),
+            (
+                j
+                for j in self._jobs.values()
+                if j.status
+                in (
+                    JobStatus.COMPLETED,
+                    JobStatus.FAILED,
+                    JobStatus.CANCELLED,
+                    JobStatus.TIMEOUT,
+                )
+            ),
             key=lambda j: j.created_at,
         )
-        for job in completed[:len(self._jobs) - self.max_jobs + 1]:
+        for job in completed[: len(self._jobs) - self.max_jobs + 1]:
             del self._jobs[job.id]

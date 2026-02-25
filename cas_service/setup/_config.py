@@ -8,6 +8,8 @@ from pathlib import Path
 
 # Project root .env (next to pyproject.toml)
 _ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
+DEFAULT_CAS_PORT = 8769
+DEFAULT_CAS_HOST = "localhost"
 
 
 def env_path() -> Path:
@@ -51,4 +53,25 @@ def write_key(key: str, value: str) -> None:
 def get_key(key: str) -> str | None:
     """Get a single key value, checking .env then os.environ."""
     config = read_config()
-    return config.get(key) or os.environ.get(key) or None
+    if key in config:
+        return config[key]
+    return os.environ.get(key) or None
+
+
+def get_cas_port(default: int = DEFAULT_CAS_PORT) -> int:
+    """Resolve CAS_PORT from config/env, with validation and fallback."""
+    raw = get_key("CAS_PORT")
+    if raw is None:
+        return default
+    try:
+        port = int(raw)
+    except ValueError:
+        return default
+    if not (1 <= port <= 65535):
+        return default
+    return port
+
+
+def get_service_url(host: str = DEFAULT_CAS_HOST) -> str:
+    """Return the local CAS base URL using the configured CAS_PORT."""
+    return f"http://{host}:{get_cas_port()}"

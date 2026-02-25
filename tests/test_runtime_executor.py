@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
-import pytest
 
 from cas_service.runtime.executor import (
     ExecResult,
@@ -15,7 +12,6 @@ from cas_service.runtime.executor import (
 
 
 class TestSubprocessExecutorSync:
-
     def test_run_echo(self):
         executor = SubprocessExecutor()
         result = executor.run(["echo", "hello"])
@@ -64,7 +60,6 @@ class TestSubprocessExecutorSync:
 
 
 class TestSubprocessExecutorAsync:
-
     def test_submit_and_wait(self):
         executor = SubprocessExecutor()
         job_id = executor.submit(["echo", "async hello"])
@@ -137,7 +132,6 @@ class TestSubprocessExecutorAsync:
 
 
 class TestJobEviction:
-
     def test_evict_old_completed_jobs(self):
         executor = SubprocessExecutor(max_jobs=3)
         ids = []
@@ -152,7 +146,6 @@ class TestJobEviction:
 
 
 class TestJobDataclass:
-
     def test_job_defaults(self):
         job = Job(id="test", command=["echo"])
         assert job.status == JobStatus.PENDING
@@ -166,7 +159,6 @@ class TestJobDataclass:
 
 
 class TestOutputTruncation:
-
     def test_truncated_true_when_exceeds_cap(self):
         executor = SubprocessExecutor(max_output=10)
         result = executor.run(

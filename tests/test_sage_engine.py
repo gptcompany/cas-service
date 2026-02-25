@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess
 from http.server import HTTPServer
 from threading import Thread
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cas_service.engines.base import Capability, ComputeRequest, ComputeResult
+from cas_service.engines.base import Capability, ComputeRequest
 from cas_service.engines.sage_engine import (
     SageEngine,
     _latex_to_sage,
@@ -26,7 +25,6 @@ from cas_service.runtime.executor import ExecResult
 
 
 class TestLatexToSage:
-
     def test_frac(self):
         assert _latex_to_sage(r"\frac{a}{b}") == "((a)/(b))"
 
@@ -67,6 +65,7 @@ class TestEquationRegex:
         engine._available = True
         # Directly test the regex used in validate
         import re
+
         sage_expr = "x == 1"
         # Should detect == and set is_equation True without substitution
         assert "==" in sage_expr
@@ -75,6 +74,7 @@ class TestEquationRegex:
     def test_single_equals_converted(self):
         """Single = should be converted to ==."""
         import re
+
         sage_expr = "x = 1"
         match = re.search(r"(?<![<>!=])=(?!=)", sage_expr)
         assert match is not None
@@ -84,12 +84,10 @@ class TestEquationRegex:
     def test_gte_lte_not_converted(self):
         """>=, <=, != should not be affected."""
         import re
+
         for expr in ["x >= 1", "x <= 1", "x != 1"]:
             match = re.search(r"(?<![<>!=])=(?!=)", expr)
             assert match is None, f"Unexpectedly matched in: {expr}"
-
-
-
 
     def test_valid_expression(self):
         assert _validate_input("x^2 + 1") is True
@@ -122,7 +120,6 @@ class TestEquationRegex:
 
 
 class TestSageEngineCapabilities:
-
     def test_capabilities(self):
         engine = SageEngine()
         assert Capability.VALIDATE in engine.capabilities
@@ -150,7 +147,6 @@ class TestSageEngineCapabilities:
 
 
 class TestSageEngineUnavailable:
-
     def test_validate_when_unavailable(self):
         engine = SageEngine(sage_path="/nonexistent/sage")
         result = engine.validate("x^2")
@@ -160,7 +156,8 @@ class TestSageEngineUnavailable:
     def test_compute_when_unavailable(self):
         engine = SageEngine(sage_path="/nonexistent/sage")
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "x^2"},
         )
@@ -175,13 +172,14 @@ class TestSageEngineUnavailable:
 
 
 class TestSageTemplateErrors:
-
     @patch.object(SageEngine, "is_available", return_value=True)
     def test_unknown_template(self, _mock):
         engine = SageEngine()
         req = ComputeRequest(
-            engine="sage", task_type="template",
-            template="nonexistent", inputs={},
+            engine="sage",
+            task_type="template",
+            template="nonexistent",
+            inputs={},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -191,8 +189,10 @@ class TestSageTemplateErrors:
     def test_missing_input(self, _mock):
         engine = SageEngine()
         req = ComputeRequest(
-            engine="sage", task_type="template",
-            template="evaluate", inputs={},
+            engine="sage",
+            task_type="template",
+            template="evaluate",
+            inputs={},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -202,7 +202,8 @@ class TestSageTemplateErrors:
     def test_invalid_input_value(self, _mock):
         engine = SageEngine()
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "__import__('os').system('ls')"},
         )
@@ -217,7 +218,6 @@ class TestSageTemplateErrors:
 
 
 class TestSageEngineExecution:
-
     @patch.object(SageEngine, "is_available", return_value=True)
     def test_successful_validate(self, _avail):
         engine = SageEngine()
@@ -280,7 +280,8 @@ class TestSageEngineExecution:
         engine._executor.run.return_value = mock_result
 
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "6*7"},
         )
@@ -301,7 +302,8 @@ class TestSageEngineExecution:
         engine._executor.run.return_value = mock_result
 
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "x^2"},
         )
@@ -319,7 +321,6 @@ _sage_available = shutil.which("sage") is not None
 
 @pytest.mark.skipif(not _sage_available, reason="SageMath not installed")
 class TestSageIntegrationValidate:
-
     def test_validate_simple_expression(self):
         engine = SageEngine(timeout=60)
         result = engine.validate("x^2 + 1")
@@ -336,11 +337,11 @@ class TestSageIntegrationValidate:
 
 @pytest.mark.skipif(not _sage_available, reason="SageMath not installed")
 class TestSageIntegrationCompute:
-
     def test_evaluate(self):
         engine = SageEngine(timeout=60)
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "2^10"},
             timeout_s=60,
@@ -352,7 +353,8 @@ class TestSageIntegrationCompute:
     def test_simplify(self):
         engine = SageEngine(timeout=60)
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="simplify",
             inputs={"expression": "(x^2 + 2*x + 1)/(x + 1)"},
             timeout_s=60,
@@ -364,7 +366,8 @@ class TestSageIntegrationCompute:
     def test_factor(self):
         engine = SageEngine(timeout=60)
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="factor",
             inputs={"expression": "x^2 - 1"},
             timeout_s=60,
@@ -377,7 +380,8 @@ class TestSageIntegrationCompute:
     def test_solve(self):
         engine = SageEngine(timeout=60)
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="solve",
             inputs={"equation": "x^2 - 4", "variable": "x"},
             timeout_s=60,
@@ -390,7 +394,8 @@ class TestSageIntegrationCompute:
     def test_differentiate(self):
         engine = SageEngine(timeout=60)
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="differentiate",
             inputs={"expression": "x^3", "variable": "x"},
             timeout_s=60,
@@ -402,7 +407,8 @@ class TestSageIntegrationCompute:
     def test_integrate(self):
         engine = SageEngine(timeout=60)
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="integrate",
             inputs={"expression": "2*x", "variable": "x"},
             timeout_s=60,
@@ -414,7 +420,8 @@ class TestSageIntegrationCompute:
     def test_latex_to_sage(self):
         engine = SageEngine(timeout=60)
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="latex_to_sage",
             inputs={"expression": "x^2 + 1"},
             timeout_s=60,
@@ -426,7 +433,8 @@ class TestSageIntegrationCompute:
     def test_group_order(self):
         engine = SageEngine(timeout=60)
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="group_order",
             inputs={"group_expr": "SymmetricGroup(3)"},
             timeout_s=60,
@@ -438,7 +446,8 @@ class TestSageIntegrationCompute:
     def test_is_abelian(self):
         engine = SageEngine(timeout=60)
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="is_abelian",
             inputs={"group_expr": "SymmetricGroup(3)"},
             timeout_s=60,
@@ -450,7 +459,8 @@ class TestSageIntegrationCompute:
     def test_center_size(self):
         engine = SageEngine(timeout=60)
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="center_size",
             inputs={"group_expr": "SymmetricGroup(3)"},
             timeout_s=60,
@@ -466,18 +476,21 @@ class TestSageIntegrationCompute:
 
 
 class TestSageGroupTheoryMocked:
-
     @patch.object(SageEngine, "is_available", return_value=True)
     def test_group_order_mocked(self, _avail):
         engine = SageEngine()
         mock_result = ExecResult(
-            returncode=0, stdout="SAGE_RESULT:6\n", stderr="", time_ms=200,
+            returncode=0,
+            stdout="SAGE_RESULT:6\n",
+            stderr="",
+            time_ms=200,
         )
         engine._executor = MagicMock()
         engine._executor.run.return_value = mock_result
 
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="group_order",
             inputs={"group_expr": "SymmetricGroup(3)"},
         )
@@ -489,13 +502,17 @@ class TestSageGroupTheoryMocked:
     def test_is_abelian_mocked(self, _avail):
         engine = SageEngine()
         mock_result = ExecResult(
-            returncode=0, stdout="SAGE_RESULT:False\n", stderr="", time_ms=200,
+            returncode=0,
+            stdout="SAGE_RESULT:False\n",
+            stderr="",
+            time_ms=200,
         )
         engine._executor = MagicMock()
         engine._executor.run.return_value = mock_result
 
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="is_abelian",
             inputs={"group_expr": "SymmetricGroup(3)"},
         )
@@ -507,13 +524,17 @@ class TestSageGroupTheoryMocked:
     def test_center_size_mocked(self, _avail):
         engine = SageEngine()
         mock_result = ExecResult(
-            returncode=0, stdout="SAGE_RESULT:1\n", stderr="", time_ms=200,
+            returncode=0,
+            stdout="SAGE_RESULT:1\n",
+            stderr="",
+            time_ms=200,
         )
         engine._executor = MagicMock()
         engine._executor.run.return_value = mock_result
 
         req = ComputeRequest(
-            engine="sage", task_type="template",
+            engine="sage",
+            task_type="template",
             template="center_size",
             inputs={"group_expr": "SymmetricGroup(3)"},
         )
@@ -525,8 +546,10 @@ class TestSageGroupTheoryMocked:
     def test_group_order_missing_input(self, _avail):
         engine = SageEngine()
         req = ComputeRequest(
-            engine="sage", task_type="template",
-            template="group_order", inputs={},
+            engine="sage",
+            task_type="template",
+            template="group_order",
+            inputs={},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -564,9 +587,11 @@ def cas_server_with_sage():
 
 def _post(addr, path, body):
     import http.client
+
     conn = http.client.HTTPConnection(addr[0], addr[1], timeout=10)
     conn.request(
-        "POST", path,
+        "POST",
+        path,
         body=json.dumps(body),
         headers={"Content-Type": "application/json"},
     )
@@ -579,6 +604,7 @@ def _post(addr, path, body):
 
 def _get(addr, path):
     import http.client
+
     conn = http.client.HTTPConnection(addr[0], addr[1], timeout=10)
     conn.request("GET", path)
     resp = conn.getresponse()
@@ -589,7 +615,6 @@ def _get(addr, path):
 
 
 class TestSageHTTPIntegration:
-
     def test_sage_in_engines_list(self, cas_server_with_sage):
         status, data = _get(cas_server_with_sage, "/engines")
         assert status == 200
@@ -601,23 +626,31 @@ class TestSageHTTPIntegration:
 
     @pytest.mark.skipif(not _sage_available, reason="SageMath not installed")
     def test_compute_via_http(self, cas_server_with_sage):
-        status, data = _post(cas_server_with_sage, "/compute", {
-            "engine": "sage",
-            "task_type": "template",
-            "template": "evaluate",
-            "inputs": {"expression": "2^10"},
-            "timeout_s": 60,
-        })
+        status, data = _post(
+            cas_server_with_sage,
+            "/compute",
+            {
+                "engine": "sage",
+                "task_type": "template",
+                "template": "evaluate",
+                "inputs": {"expression": "2^10"},
+                "timeout_s": 60,
+            },
+        )
         assert status == 200
         assert data["success"] is True
         assert data["result"]["value"] == "1024"
 
     def test_compute_unknown_template_via_http(self, cas_server_with_sage):
-        status, data = _post(cas_server_with_sage, "/compute", {
-            "engine": "sage",
-            "task_type": "template",
-            "template": "nonexistent",
-        })
+        status, data = _post(
+            cas_server_with_sage,
+            "/compute",
+            {
+                "engine": "sage",
+                "task_type": "template",
+                "template": "nonexistent",
+            },
+        )
         assert status == 200
         assert data["success"] is False
         assert data["error_code"] == "UNKNOWN_TEMPLATE"

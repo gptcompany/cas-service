@@ -61,7 +61,7 @@ uv run python -m cas_service.main
 
 ## API
 
-Default port: **8769**
+Default port: `CAS_PORT` (default `8769`)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -72,6 +72,9 @@ Default port: **8769**
 | `POST /compute` | Run a template-based compute task |
 
 ### Validate Example
+
+Examples below assume the default port (`CAS_PORT=8769`). If you changed it, replace
+`localhost:8769` with your configured port.
 
 ```bash
 # Default: single engine (SageMath if available, else SymPy)
@@ -132,6 +135,12 @@ curl -s -X POST http://localhost:8769/compute \
 docker compose build
 dotenvx run -f .env -- docker compose up -d
 curl -s localhost:8769/health | jq .
+```
+
+Or with an explicit shell fallback:
+
+```bash
+curl -s "localhost:${CAS_PORT:-8769}/health" | jq .
 ```
 
 The `.env` file is encrypted with dotenvx. `dotenvx run` decrypts it and passes the environment variables to the container. If you don't use dotenvx, pass variables manually:
