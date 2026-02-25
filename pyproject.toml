@@ -6,6 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "sympy>=1.13",
     "antlr4-python3-runtime==4.11.1",
+    "questionary>=2.0",
+    "rich>=13.0",
 ]
 
 [project.scripts]
@@ -17,8 +19,7 @@ dev = [
     "pytest-cov>=5.0",
 ]
 setup = [
-    "questionary>=2.0",
-    "rich>=13.0",
+    # Compatibility alias: setup wizard deps are now core dependencies.
 ]
 
 [build-system]

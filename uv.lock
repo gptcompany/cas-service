@@ -17,6 +17,8 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "antlr4-python3-runtime" },
+    { name = "questionary" },
+    { name = "rich" },
     { name = "sympy" },
 ]
 
@@ -25,18 +27,14 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
-setup = [
-    { name = "questionary" },
-    { name = "rich" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "antlr4-python3-runtime", specifier = "==4.11.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
-    { name = "questionary", marker = "extra == 'setup'", specifier = ">=2.0" },
-    { name = "rich", marker = "extra == 'setup'", specifier = ">=13.0" },
+    { name = "questionary", specifier = ">=2.0" },
+    { name = "rich", specifier = ">=13.0" },
     { name = "sympy", specifier = ">=1.13" },
 ]
 provides-extras = ["dev", "setup"]
