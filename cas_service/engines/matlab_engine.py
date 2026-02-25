@@ -452,17 +452,16 @@ class MatlabEngine(BaseEngine):
                 [self.matlab_path, "-batch", "disp(version)"],
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=30,
             )
             for line in result.stdout.strip().split("\n"):
                 line = line.strip()
                 if re.match(r"\d+\.\d+", line):
                     self._cached_version = f"MATLAB {line}"
                     return self._cached_version
-            self._cached_version = "MATLAB (version unknown)"
+            return "MATLAB (version unknown)"
         except Exception:
-            self._cached_version = "MATLAB (unavailable)"
-        return self._cached_version
+            return "MATLAB (unavailable)"
 
     @property
     def capabilities(self) -> list[Capability]:
