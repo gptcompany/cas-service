@@ -9,9 +9,15 @@ uv sync --extra setup
 cas-setup              # Interactive guided setup
 ```
 
-The wizard checks Python, SymPy, MATLAB, SageMath, and WolframAlpha, configures paths/keys to `.env`, and starts the service.
+`cas-setup` (without subcommands) opens an interactive menu with per-step status, free navigation, and a `Run all pending` action.
 
-Subcommands: `cas-setup engines | configure | service | verify`
+The wizard covers Python/SymPy checks, optional MATLAB/SageMath/WolframAlpha configuration, deployment mode selection (`systemd` / `docker compose` / foreground), and service verification.
+
+Subcommands (kept as linear flows): `cas-setup engines | configure | service | verify`
+
+Practical notes:
+- Optional steps (for example MATLAB or WolframAlpha) may be marked `Skipped` and do not fail the wizard.
+- `cas-setup` exits `0` when all remaining steps are `OK` / `Skipped` / `Warning`; exits `1` on abort or unresolved `Pending` / `Failed` steps.
 
 ## Manual Setup
 
@@ -212,6 +218,6 @@ uv run python -m cas_service.main
 Engine paths and API keys are stored in the project `.env` file. Use the wizard to configure:
 
 ```bash
-cas-setup configure     # Re-configure engine paths and API keys
-cas-setup verify        # Verify running service + smoke test all engines
+cas-setup configure     # Re-configure engine paths and API keys (linear subcommand)
+cas-setup verify        # Verify running service + smoke test all engines (linear subcommand)
 ```
