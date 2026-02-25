@@ -34,6 +34,7 @@ class SageStep:
     """Detect, install, and configure SageMath."""
 
     name = "SageMath"
+    description = "Find or install SageMath (apt/brew)"
 
     def __init__(self) -> None:
         self._found_path: str | None = None

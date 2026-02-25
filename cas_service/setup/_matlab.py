@@ -30,6 +30,7 @@ class MatlabStep:
     """Search for MATLAB binary. This engine is optional."""
 
     name = "MATLAB (optional)"
+    description = "Optional MATLAB binary discovery"
 
     def __init__(self) -> None:
         self._found_path: str | None = None

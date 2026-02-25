@@ -15,6 +15,7 @@ class SympyStep:
     """Verify SymPy is importable in the project venv with version >= 1.12."""
 
     name = "SymPy"
+    description = "Check SymPy import/version in venv"
 
     def check(self) -> bool:
         """Return True if SymPy can be imported with sufficient version."""

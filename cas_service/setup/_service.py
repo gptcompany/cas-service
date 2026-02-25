@@ -58,6 +58,7 @@ class ServiceStep:
     """Configure CAS service deployment: systemd, Docker Compose, or foreground."""
 
     name = "Service deployment"
+    description = "Choose systemd, docker, or foreground"
 
     def __init__(self) -> None:
         self._mode: str | None = None  # "systemd", "docker", or "foreground"

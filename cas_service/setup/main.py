@@ -14,7 +14,7 @@ import sys
 
 from rich.console import Console
 
-from cas_service.setup._runner import run_steps
+from cas_service.setup._runner import run_interactive_menu, run_steps
 
 BANNER = r"""
   ___   _   ___   ___              _
@@ -151,11 +151,11 @@ def main(args: list[str] | None = None) -> None:
         console.print(f"[bold]{description}[/]")
         console.print()
         steps = factory()
+        success = run_steps(steps, console)
     else:
         _print_welcome(console)
         steps = _all_steps()
-
-    success = run_steps(steps, console)
+        success = run_interactive_menu(steps, console)
     if not success:
         sys.exit(1)
     console.print("[bold green]Setup complete.[/]")

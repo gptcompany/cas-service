@@ -12,6 +12,7 @@ class WolframAlphaStep:
     """Configure WolframAlpha API key — optional engine."""
 
     name = "WolframAlpha (optional)"
+    description = "Optional WolframAlpha AppID"
 
     def check(self) -> bool:
         """Return True if CAS_WOLFRAMALPHA_APPID is configured."""

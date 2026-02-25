@@ -819,6 +819,7 @@ class TestRunner:
         """Create a mock step with configurable behavior."""
         step = MagicMock()
         step.name = name
+        step.description = f"{name} step"
         step.check.return_value = check
         step.install.return_value = install
         step.verify.return_value = verify
@@ -973,6 +974,75 @@ class TestRunner:
         result = run_steps([], _console())
         assert result is True
 
+    @patch("cas_service.setup._runner.questionary")
+    def test_interactive_menu_exit_all_ok(self, mock_q):
+        """run_interactive_menu returns True when user exits and all steps are OK."""
+        from cas_service.setup._runner import run_interactive_menu
+
+        mock_q.select.return_value.ask.return_value = "exit"
+        steps = [
+            self._make_step("Python", check=True),
+            self._make_step("SymPy", check=True),
+        ]
+        result = run_interactive_menu(steps, _console())
+        assert result is True
+        for step in steps:
+            assert step.check.call_count == 1
+
+    @patch("cas_service.setup._runner._run_single_step", return_value="ok")
+    @patch("cas_service.setup._runner.questionary")
+    def test_interactive_menu_run_all_pending(self, mock_q, mock_run_one):
+        """run_interactive_menu runs only pending steps for 'Run all pending'."""
+        from cas_service.setup._runner import run_interactive_menu
+
+        mock_q.select.return_value.ask.side_effect = ["run_all", "exit"]
+        step_ok = self._make_step("Python", check=True)
+        step_pending = self._make_step("Sage")
+        step_pending.check.side_effect = [False, True, True]
+
+        result = run_interactive_menu([step_ok, step_pending], _console())
+
+        assert result is True
+        mock_run_one.assert_called_once()
+        assert mock_run_one.call_args[0][0] is step_pending
+
+    @patch("cas_service.setup._runner._run_single_step", return_value="skipped")
+    @patch("cas_service.setup._runner.questionary")
+    def test_interactive_menu_preserves_skipped_status(self, mock_q, mock_run_one):
+        """Skipping an optional step in menu should not force exit code 1."""
+        from cas_service.setup._runner import run_interactive_menu
+
+        mock_q.select.return_value.ask.side_effect = [0, "exit"]
+        step = self._make_step("MATLAB")
+        step.check.side_effect = [False, False, False]
+
+        result = run_interactive_menu([step], _console())
+
+        assert result is True
+        mock_run_one.assert_called_once()
+
+    @patch("cas_service.setup._runner._run_single_step", return_value="ok")
+    @patch("cas_service.setup._runner.questionary")
+    def test_interactive_menu_refreshes_only_invalidated_steps(
+        self, mock_q, mock_run_one
+    ):
+        """Menu uses cached statuses and refreshes after invalidation only."""
+        from cas_service.setup._runner import run_interactive_menu
+
+        mock_q.select.return_value.ask.side_effect = [0, "exit"]
+        step1 = self._make_step("Python")
+        step2 = self._make_step("SymPy")
+        # Initial snapshot: both pending. After running step1, refresh from step1 onward: both ok.
+        step1.check.side_effect = [False, True]
+        step2.check.side_effect = [False, True]
+
+        result = run_interactive_menu([step1, step2], _console())
+
+        assert result is True
+        mock_run_one.assert_called_once()
+        assert step1.check.call_count == 2
+        assert step2.check.call_count == 2
+
 
 # ===========================================================================
 # Main entry point
@@ -981,15 +1051,19 @@ class TestRunner:
 
 class TestMain:
     @patch("cas_service.setup.main.run_steps", return_value=True)
+    @patch("cas_service.setup.main.run_interactive_menu", return_value=True)
     @patch("cas_service.setup.main.Console")
-    def test_main_no_args_runs_all(self, mock_console_cls, mock_run_steps):
-        """main() with no args runs all setup steps."""
+    def test_main_no_args_runs_all(
+        self, mock_console_cls, mock_run_menu, mock_run_steps
+    ):
+        """main() with no args runs interactive menu with all setup steps."""
         from cas_service.setup.main import main
 
         mock_console_cls.return_value = _console()
         main(args=[])
-        mock_run_steps.assert_called_once()
-        steps = mock_run_steps.call_args[0][0]
+        mock_run_menu.assert_called_once()
+        mock_run_steps.assert_not_called()
+        steps = mock_run_menu.call_args[0][0]
         assert len(steps) == 7  # Python, SymPy, MATLAB, Sage, WA, Service, Verify
 
     @patch("cas_service.setup.main.run_steps", return_value=True)
@@ -1047,10 +1121,10 @@ class TestMain:
         # Should not raise
         main(args=["--help"])
 
-    @patch("cas_service.setup.main.run_steps", return_value=False)
+    @patch("cas_service.setup.main.run_interactive_menu", return_value=False)
     @patch("cas_service.setup.main.Console")
-    def test_main_failure_exits_1(self, mock_console_cls, mock_run_steps):
-        """main() exits with code 1 when run_steps returns False."""
+    def test_main_failure_exits_1(self, mock_console_cls, mock_run_menu):
+        """main() exits with code 1 when interactive menu returns False."""
         from cas_service.setup.main import main
 
         mock_console_cls.return_value = _console()

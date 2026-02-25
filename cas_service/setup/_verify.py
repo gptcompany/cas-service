@@ -34,6 +34,7 @@ class VerifyStep:
     """Check the running CAS service health and engine availability."""
 
     name = "Service verification"
+    description = "Health check and engine smoke tests"
 
     def check(self) -> bool:
         """Return True if /health returns status ok."""

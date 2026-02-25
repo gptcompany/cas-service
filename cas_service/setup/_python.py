@@ -16,6 +16,7 @@ class PythonStep:
     """Verify Python >= 3.10, uv installed, and dependencies synced."""
 
     name = "Python + uv"
+    description = "Python >= 3.10, uv, project dependencies"
 
     def check(self) -> bool:
         """Return True if Python >= 3.10, uv exists, and venv is synced."""
