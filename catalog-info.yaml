@@ -1,0 +1,23 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cas-service
+  title: CAS Service
+  description: >
+    Multi-engine Computer Algebra System microservice for formula validation and
+    compute using SymPy, SageMath, and optional MATLAB/WolframAlpha.
+  annotations:
+    github.com/project-slug: gptcompany/cas-service
+  tags:
+    - python
+    - cas
+    - sympy
+    - sagemath
+    - matlab
+    - wolframalpha
+    - docker
+spec:
+  type: service
+  lifecycle: experimental
+  owner: user:default/sam
+  system: claude-infrastructure

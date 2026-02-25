@@ -1,0 +1,85 @@
+name: Sandbox Deploy Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner_labels_json:
+        description: 'Runner labels JSON (e.g. ["self-hosted","linux","ws"])'
+        required: true
+        type: string
+        default: '["self-hosted","linux","ws"]'
+      rebuild_image:
+        description: Rebuild Docker image before validation
+        required: true
+        type: boolean
+        default: false
+      leave_running:
+        description: Leave docker compose stack running after validation
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  sandbox-validate:
+    name: Docker Compose Health Validation
+    runs-on: ${{ fromJSON(inputs.runner_labels_json) }}
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Docker versions
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Bring up CAS service
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.rebuild_image }}" = "true" ]; then
+            docker compose up -d --build
+          else
+            docker compose up -d
+          fi
+
+      - name: Wait for CAS health endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="http://localhost:${CAS_PORT:-8769}/health"
+          timeout_s=180
+          start="$(date +%s)"
+          while true; do
+            if curl -fsS --max-time 5 "$url" >/tmp/cas-health.json; then
+              echo "OK  $url"
+              cat /tmp/cas-health.json | python -m json.tool || cat /tmp/cas-health.json
+              break
+            fi
+            if [ $(( $(date +%s) - start )) -ge "$timeout_s" ]; then
+              echo "TIMEOUT $url"
+              exit 1
+            fi
+            sleep 3
+          done
+
+      - name: Capture compose diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p .artifacts
+          docker compose ps > .artifacts/compose-ps.txt || true
+          docker compose logs --tail=200 > .artifacts/compose-logs.txt || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-service-sandbox-validation
+          path: .artifacts/
+          if-no-files-found: ignore
+
+      - name: Tear down stack
+        if: ${{ always() && !inputs.leave_running }}
+        run: docker compose down
