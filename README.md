@@ -1,6 +1,6 @@
 # CAS Service
 
-Multi-engine Computer Algebra System microservice. Validates mathematical formulas using SymPy, SageMath, and optionally MATLAB with consensus-based verification. Supports template-based compute via SageMath (including group theory) and optional WolframAlpha backend. Engines run in parallel for validation.
+Multi-engine Computer Algebra System microservice. Validates mathematical formulas using SymPy, SageMath, and optionally MATLAB with consensus-based verification. Supports template-based compute via SymPy (6 templates), SageMath (11 templates, incl. group theory), MATLAB (4 templates), and WolframAlpha (3 templates). Engines run in parallel for validation.
 
 ## Quick Setup
 
@@ -26,14 +26,34 @@ uv run python -m cas_service.main
 
 | Engine | Required | Capabilities | Description |
 |--------|----------|-------------|-------------|
-| SymPy >= 1.13 | Yes | validate | Pure Python CAS, always available |
+| SymPy >= 1.13 | Yes | validate, compute | Pure Python CAS, always available. 6 compute templates |
 | SageMath 9.5+ | Yes | validate, compute | Full CAS: 11 compute templates (incl. group theory) |
-| MATLAB | No | validate | Commercial CAS, optional |
+| MATLAB | No | validate, compute | Commercial CAS, optional. 4 compute templates |
 | WolframAlpha | No | compute, remote | Remote API oracle |
 
 - **Validation engines** run in parallel via ThreadPoolExecutor
 - **Consensus**: formula is VALID only if all available engines agree
 - **Graceful degradation**: service starts even if some engines are unavailable
+
+### SymPy Compute Templates
+
+| Template | Required Inputs | Description |
+|----------|----------------|-------------|
+| `evaluate` | `expression` | Evaluate a mathematical expression numerically |
+| `simplify` | `expression` | Simplify a mathematical expression |
+| `solve` | `equation`, `variable`? | Solve an equation (default: x) |
+| `factor` | `expression` | Factor a polynomial |
+| `integrate` | `expression`, `variable`? | Symbolic integration |
+| `differentiate` | `expression`, `variable`? | Symbolic differentiation |
+
+### MATLAB Compute Templates
+
+| Template | Required Inputs | Description |
+|----------|----------------|-------------|
+| `evaluate` | `expression` | Evaluate via `str2sym` + `simplify` |
+| `simplify` | `expression` | Simplify a mathematical expression |
+| `solve` | `equation`, `variable`? | Solve an equation (default: x) |
+| `factor` | `expression` | Factor a polynomial |
 
 ### SageMath Compute Templates
 
@@ -96,6 +116,21 @@ curl -s -X POST http://localhost:8769/validate \
 ### Compute Examples
 
 ```bash
+# SymPy: simplify
+curl -s -X POST http://localhost:8769/compute \
+  -H "Content-Type: application/json" \
+  -d '{"engine": "sympy", "task_type": "template", "template": "simplify", "inputs": {"expression": "x**2 + 2*x + 1"}}' | jq .
+
+# SymPy: solve equation
+curl -s -X POST http://localhost:8769/compute \
+  -H "Content-Type: application/json" \
+  -d '{"engine": "sympy", "task_type": "template", "template": "solve", "inputs": {"equation": "x**2 - 4", "variable": "x"}}' | jq .
+
+# MATLAB: evaluate (requires MATLAB on PATH)
+curl -s -X POST http://localhost:8769/compute \
+  -H "Content-Type: application/json" \
+  -d '{"engine": "matlab", "task_type": "template", "template": "evaluate", "inputs": {"expression": "2^10"}, "timeout_s": 60}' | jq .
+
 # SageMath: group order
 curl -s -X POST http://localhost:8769/compute \
   -H "Content-Type: application/json" \
