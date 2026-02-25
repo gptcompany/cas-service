@@ -168,7 +168,8 @@ class SympyEngine(BaseEngine):
     def __init__(self, timeout: int = 5) -> None:
         self.timeout = timeout
         self._executor = SubprocessExecutor(
-            default_timeout=timeout, max_output=64 * 1024,
+            default_timeout=timeout,
+            max_output=64 * 1024,
         )
 
     # -- validate ----------------------------------------------------------
@@ -189,7 +190,9 @@ class SympyEngine(BaseEngine):
         return self._parse_validate_output(result, elapsed)
 
     def _parse_validate_output(
-        self, exec_result: Any, elapsed: int,
+        self,
+        exec_result: Any,
+        elapsed: int,
     ) -> EngineResult:
         """Parse tagged output from the SymPy validate script."""
         if exec_result.timed_out:
@@ -244,9 +247,7 @@ class SympyEngine(BaseEngine):
             )
 
         # Check required inputs
-        missing = [
-            k for k in tmpl["required_inputs"] if k not in request.inputs
-        ]
+        missing = [k for k in tmpl["required_inputs"] if k not in request.inputs]
         if missing:
             return ComputeResult(
                 engine=self.name,
@@ -267,10 +268,12 @@ class SympyEngine(BaseEngine):
                     time_ms=int((time.time() - start) * 1000),
                 )
 
-        payload = json.dumps({
-            "task": request.template,
-            "inputs": request.inputs,
-        })
+        payload = json.dumps(
+            {
+                "task": request.template,
+                "inputs": request.inputs,
+            }
+        )
         encoded = base64.b64encode(payload.encode()).decode()
 
         timeout_s = min(request.timeout_s, self.timeout)
@@ -284,7 +287,9 @@ class SympyEngine(BaseEngine):
         return self._parse_compute_output(result, elapsed)
 
     def _parse_compute_output(
-        self, exec_result: Any, elapsed: int,
+        self,
+        exec_result: Any,
+        elapsed: int,
     ) -> ComputeResult:
         """Parse tagged output from the SymPy compute script."""
         if exec_result.timed_out:
@@ -335,6 +340,7 @@ class SympyEngine(BaseEngine):
     def is_available(self) -> bool:
         try:
             import sympy  # noqa: F401
+
             return True
         except ImportError:
             return False
@@ -342,6 +348,7 @@ class SympyEngine(BaseEngine):
     def get_version(self) -> str:
         try:
             import sympy
+
             return sympy.__version__
         except ImportError:
             return "not installed"
@@ -368,6 +375,6 @@ def _parse_tags(stdout: str) -> dict[str, str]:
         if line.startswith("SYMPY_"):
             colon = line.index(":")
             key = line[:colon]
-            value = line[colon + 1:]
+            value = line[colon + 1 :]
             tags[key] = value
     return tags

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from cas_service.engines.base import Capability, ComputeRequest
 from cas_service.engines.sympy_engine import (
@@ -20,7 +19,6 @@ from cas_service.runtime.executor import ExecResult
 
 
 class TestSympyInputValidation:
-
     def test_valid_expression(self):
         assert _validate_input("x**2 + 1") is True
 
@@ -52,7 +50,6 @@ class TestSympyInputValidation:
 
 
 class TestSympyCapabilities:
-
     def test_capabilities(self):
         engine = SympyEngine()
         assert Capability.VALIDATE in engine.capabilities
@@ -86,7 +83,6 @@ class TestSympyCapabilities:
 
 
 class TestSympyValidateMocked:
-
     def test_successful_validate(self):
         engine = SympyEngine()
         mock_result = ExecResult(
@@ -156,7 +152,6 @@ class TestSympyValidateMocked:
 
 
 class TestSympyComputeMocked:
-
     def test_successful_compute(self):
         engine = SympyEngine()
         mock_result = ExecResult(
@@ -169,7 +164,8 @@ class TestSympyComputeMocked:
         engine._executor.run.return_value = mock_result
 
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="simplify",
             inputs={"expression": "x**2 + 2*x + 1"},
         )
@@ -180,8 +176,10 @@ class TestSympyComputeMocked:
     def test_unknown_template(self):
         engine = SympyEngine()
         req = ComputeRequest(
-            engine="sympy", task_type="template",
-            template="nonexistent", inputs={},
+            engine="sympy",
+            task_type="template",
+            template="nonexistent",
+            inputs={},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -190,8 +188,10 @@ class TestSympyComputeMocked:
     def test_missing_input(self):
         engine = SympyEngine()
         req = ComputeRequest(
-            engine="sympy", task_type="template",
-            template="evaluate", inputs={},
+            engine="sympy",
+            task_type="template",
+            template="evaluate",
+            inputs={},
         )
         result = engine.compute(req)
         assert result.success is False
@@ -200,7 +200,8 @@ class TestSympyComputeMocked:
     def test_invalid_input_value(self):
         engine = SympyEngine()
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "__import__('os').system('ls')"},
         )
@@ -221,7 +222,8 @@ class TestSympyComputeMocked:
         engine._executor.run.return_value = mock_result
 
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "2**100"},
         )
@@ -241,7 +243,8 @@ class TestSympyComputeMocked:
         engine._executor.run.return_value = mock_result
 
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "x^2"},
         )
@@ -261,7 +264,8 @@ class TestSympyComputeMocked:
         engine._executor.run.return_value = mock_result
 
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "foo"},
         )
@@ -306,7 +310,8 @@ class TestSympyIntegrationCompute:
     def test_simplify(self):
         engine = SympyEngine(timeout=30)
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="simplify",
             inputs={"expression": "(x**2 - 1)/(x - 1)"},
             timeout_s=30,
@@ -318,7 +323,8 @@ class TestSympyIntegrationCompute:
     def test_solve(self):
         engine = SympyEngine(timeout=30)
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="solve",
             inputs={"equation": "x**2 - 4", "variable": "x"},
             timeout_s=30,
@@ -331,7 +337,8 @@ class TestSympyIntegrationCompute:
     def test_factor(self):
         engine = SympyEngine(timeout=30)
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="factor",
             inputs={"expression": "x**2 - 1"},
             timeout_s=30,
@@ -344,7 +351,8 @@ class TestSympyIntegrationCompute:
     def test_differentiate(self):
         engine = SympyEngine(timeout=30)
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="differentiate",
             inputs={"expression": "x**3", "variable": "x"},
             timeout_s=30,
@@ -356,7 +364,8 @@ class TestSympyIntegrationCompute:
     def test_integrate(self):
         engine = SympyEngine(timeout=30)
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="integrate",
             inputs={"expression": "2*x", "variable": "x"},
             timeout_s=30,
@@ -368,7 +377,8 @@ class TestSympyIntegrationCompute:
     def test_evaluate(self):
         engine = SympyEngine(timeout=30)
         req = ComputeRequest(
-            engine="sympy", task_type="template",
+            engine="sympy",
+            task_type="template",
             template="evaluate",
             inputs={"expression": "2**10"},
             timeout_s=30,

@@ -259,7 +259,8 @@ class SageEngine(BaseEngine):
         self.sage_path = sage_path or os.environ.get("CAS_SAGE_PATH", "sage")
         self.timeout = timeout
         self._executor = SubprocessExecutor(
-            default_timeout=timeout, max_output=64 * 1024,
+            default_timeout=timeout,
+            max_output=64 * 1024,
         )
         self._available: bool | None = None
         self._version: str = "unknown"
@@ -297,10 +298,12 @@ class SageEngine(BaseEngine):
                 sage_expr = re.sub(r"(?<![<>!=])=(?!=)", "==", sage_expr)
                 is_equation = True
 
-        payload = json.dumps({
-            "expression": sage_expr,
-            "is_equation": is_equation,
-        })
+        payload = json.dumps(
+            {
+                "expression": sage_expr,
+                "is_equation": is_equation,
+            }
+        )
         encoded = base64.b64encode(payload.encode()).decode()
 
         result = self._executor.run(
@@ -310,10 +313,16 @@ class SageEngine(BaseEngine):
         )
 
         elapsed = int((time.time() - start) * 1000)
-        return self._parse_validate_output(result.stdout, result.stderr, elapsed, result)
+        return self._parse_validate_output(
+            result.stdout, result.stderr, elapsed, result
+        )
 
     def _parse_validate_output(
-        self, stdout: str, stderr: str, elapsed: int, exec_result: Any,
+        self,
+        stdout: str,
+        stderr: str,
+        elapsed: int,
+        exec_result: Any,
     ) -> EngineResult:
         """Parse tagged output from the Sage validate script."""
         if exec_result.timed_out:
@@ -377,9 +386,7 @@ class SageEngine(BaseEngine):
             )
 
         # Check required inputs
-        missing = [
-            k for k in tmpl["required_inputs"] if k not in request.inputs
-        ]
+        missing = [k for k in tmpl["required_inputs"] if k not in request.inputs]
         if missing:
             return ComputeResult(
                 engine=self.name,
@@ -400,10 +407,12 @@ class SageEngine(BaseEngine):
                     time_ms=int((time.time() - start) * 1000),
                 )
 
-        payload = json.dumps({
-            "task": request.template,
-            "inputs": request.inputs,
-        })
+        payload = json.dumps(
+            {
+                "task": request.template,
+                "inputs": request.inputs,
+            }
+        )
         encoded = base64.b64encode(payload.encode()).decode()
 
         timeout_s = min(request.timeout_s, self.timeout)
@@ -417,7 +426,9 @@ class SageEngine(BaseEngine):
         return self._parse_compute_output(result, elapsed)
 
     def _parse_compute_output(
-        self, exec_result: Any, elapsed: int,
+        self,
+        exec_result: Any,
+        elapsed: int,
     ) -> ComputeResult:
         """Parse tagged output from the Sage compute script."""
         if exec_result.timed_out:
@@ -519,6 +530,6 @@ def _parse_tags(stdout: str) -> dict[str, str]:
         if line.startswith("SAGE_"):
             colon = line.index(":")
             key = line[:colon]
-            value = line[colon + 1:]
+            value = line[colon + 1 :]
             tags[key] = value
     return tags

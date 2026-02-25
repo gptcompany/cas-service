@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 
 from rich.console import Console
 
@@ -22,16 +21,18 @@ class WolframAlphaStep:
         """Interactive API key setup with secure (no-echo) input."""
         existing = get_key("CAS_WOLFRAMALPHA_APPID")
         if existing:
-            masked = existing[:4] + "..." + existing[-4:] if len(existing) > 8 else "****"
+            masked = (
+                existing[:4] + "..." + existing[-4:] if len(existing) > 8 else "****"
+            )
             console.print(f"  WolframAlpha AppID already configured: {masked}")
-            console.print("  [dim]Enter a new key to replace, or press Enter to keep.[/]")
+            console.print(
+                "  [dim]Enter a new key to replace, or press Enter to keep.[/]"
+            )
 
         try:
             import questionary
 
-            new_key = questionary.password(
-                "WolframAlpha AppID (Enter to skip):"
-            ).ask()
+            new_key = questionary.password("WolframAlpha AppID (Enter to skip):").ask()
             if new_key and new_key.strip():
                 write_key("CAS_WOLFRAMALPHA_APPID", new_key.strip())
                 console.print("  [green]Saved CAS_WOLFRAMALPHA_APPID to .env[/]")
@@ -42,10 +43,14 @@ class WolframAlphaStep:
         except Exception:
             pass
 
-        console.print("  WolframAlpha is [bold]optional[/] — the service works without it.")
+        console.print(
+            "  WolframAlpha is [bold]optional[/] — the service works without it."
+        )
         console.print("  To enable later:")
         console.print("    1. Get an AppID at https://developer.wolframalpha.com/")
-        console.print(f"    2. Add CAS_WOLFRAMALPHA_APPID=<your-appid> to: [bold]{env_path()}[/]")
+        console.print(
+            f"    2. Add CAS_WOLFRAMALPHA_APPID=<your-appid> to: [bold]{env_path()}[/]"
+        )
         console.print("    3. Or re-run: [bold]cas-setup configure[/]")
         return True  # Optional — always passes
 
