@@ -2,6 +2,7 @@
 
 ![CI](https://github.com/gptcompany/cas-service/actions/workflows/ci.yml/badge.svg?branch=main)
 ![Sandbox Validation](https://github.com/gptcompany/cas-service/actions/workflows/sandbox-validate.yml/badge.svg?branch=main)
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/gptprojectmanager/ac39e6516b7114f96b84ba445b8e7a83/raw/cas-service-coverage.json)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python)
 ![CAS Engines](https://img.shields.io/badge/CAS-SymPy%20%7C%20Sage%20%7C%20MATLAB%20%7C%20WA-orange?style=flat-square)
 ![License](https://img.shields.io/github/license/gptcompany/cas-service?style=flat-square)
