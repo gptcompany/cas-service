@@ -162,6 +162,7 @@ class MatlabEngine(BaseEngine):
     ) -> None:
         self.matlab_path = matlab_path
         self.timeout = timeout
+        self._cached_version: str | None = None
 
     def validate(self, latex: str) -> EngineResult:
         start = time.time()
@@ -444,6 +445,8 @@ class MatlabEngine(BaseEngine):
     # -- availability / version --------------------------------------------
 
     def get_version(self) -> str:
+        if self._cached_version is not None:
+            return self._cached_version
         try:
             result = subprocess.run(
                 [self.matlab_path, "-batch", "disp(version)"],
@@ -454,10 +457,12 @@ class MatlabEngine(BaseEngine):
             for line in result.stdout.strip().split("\n"):
                 line = line.strip()
                 if re.match(r"\d+\.\d+", line):
-                    return f"MATLAB {line}"
-            return "MATLAB (version unknown)"
+                    self._cached_version = f"MATLAB {line}"
+                    return self._cached_version
+            self._cached_version = "MATLAB (version unknown)"
         except Exception:
-            return "MATLAB (unavailable)"
+            self._cached_version = "MATLAB (unavailable)"
+        return self._cached_version
 
     @property
     def capabilities(self) -> list[Capability]:
