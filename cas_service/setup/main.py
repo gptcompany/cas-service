@@ -88,6 +88,33 @@ def _verify_steps() -> list:
     return [VerifyStep()]
 
 
+def _print_welcome(console: Console) -> None:
+    """Print a short welcome guide for non-technical users."""
+    console.print("[bold]Full setup — this wizard will:[/]")
+    console.print()
+    console.print(
+        "  1. Check Python and SymPy     [dim](required, usually pre-installed)[/]"
+    )
+    console.print("  2. Find MATLAB                [dim](optional, commercial CAS)[/]")
+    console.print(
+        "  3. Find or install SageMath    [dim](optional, open-source CAS)[/]"
+    )
+    console.print(
+        "  4. Configure WolframAlpha      [dim](optional, remote API — needs key)[/]"
+    )
+    console.print(
+        "  5. Choose how to run           [dim](systemd / Docker / foreground)[/]"
+    )
+    console.print(
+        "  6. Verify everything works     [dim](health check + engine smoke test)[/]"
+    )
+    console.print()
+    console.print(
+        "  [dim]Press Enter to accept defaults. Optional engines can be skipped.[/]"
+    )
+    console.print()
+
+
 SUBCOMMANDS = {
     "engines": (_engine_steps, "Check CAS engines (SymPy, MATLAB, Sage, WA)"),
     "configure": (_configure_steps, "Re-configure engine paths and API keys"),
@@ -125,8 +152,7 @@ def main(args: list[str] | None = None) -> None:
         console.print()
         steps = factory()
     else:
-        console.print("[bold]Running full setup...[/]")
-        console.print()
+        _print_welcome(console)
         steps = _all_steps()
 
     success = run_steps(steps, console)

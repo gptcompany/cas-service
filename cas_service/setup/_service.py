@@ -102,6 +102,19 @@ class ServiceStep:
             self._mode = "foreground"
             return self._show_foreground(console)
 
+        console.print("  Deployment options:")
+        if has_systemd:
+            console.print(
+                "    [bold]systemd[/]  — runs as background service, auto-starts on boot"
+            )
+        if has_docker:
+            console.print(
+                "    [bold]docker[/]   — runs in container (SageMath included, MATLAB via volume)"
+            )
+        console.print(
+            "    [bold]foreground[/] — runs in terminal (for testing / development)"
+        )
+        console.print()
         self._mode = questionary.select(
             "How do you want to run the CAS service?",
             choices=choices,
