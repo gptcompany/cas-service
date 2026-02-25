@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -586,6 +587,85 @@ class TestServiceStep:
         step = self._make()
         assert step._mode is None
         assert step.verify() is True
+
+
+# ===========================================================================
+# Docker MATLAB volume mount
+# ===========================================================================
+
+
+class TestEnableMatlabVolume:
+    """Tests for _enable_matlab_volume helper."""
+
+    def _call(self, compose_text, matlab_root):
+        from cas_service.setup._service import _enable_matlab_volume
+
+        return _enable_matlab_volume(compose_text, matlab_root)
+
+    def test_uncomments_existing_volume(self):
+        """Uncomments the commented-out MATLAB volume section."""
+        compose = (
+            "services:\n"
+            "  cas-service:\n"
+            "    restart: unless-stopped\n"
+            "    # Per MATLAB: decommentare e impostare il path host\n"
+            "    # volumes:\n"
+            "    #   - /usr/local/MATLAB:/opt/matlab:ro\n"
+        )
+        result = self._call(compose, "/media/sam/3TB-WDC/matlab2025")
+        assert "volumes:" in result
+        assert "/media/sam/3TB-WDC/matlab2025:/opt/matlab:ro" in result
+        assert "#" not in result.split("volumes:")[1].split("\n")[0]
+
+    def test_inserts_after_restart_if_no_volumes(self):
+        """Adds volumes section after restart line if none exists."""
+        compose = "services:\n  cas-service:\n    restart: unless-stopped\n"
+        result = self._call(compose, "/opt/MATLAB/R2025b")
+        assert "volumes:" in result
+        assert "/opt/MATLAB/R2025b:/opt/matlab:ro" in result
+
+    def test_returns_unchanged_if_no_anchor(self):
+        """Returns text unchanged if no restart line found."""
+        compose = "services:\n  cas-service:\n    build: .\n"
+        result = self._call(compose, "/opt/MATLAB")
+        assert result == compose
+
+
+class TestMaybeEnableMatlabVolume:
+    """Tests for ServiceStep._maybe_enable_matlab_volume."""
+
+    @patch("cas_service.setup._service.get_key", return_value=None)
+    def test_noop_when_no_matlab_configured(self, mock_key):
+        """Does nothing if CAS_MATLAB_PATH not set."""
+        from cas_service.setup._service import ServiceStep
+
+        ServiceStep._maybe_enable_matlab_volume(_console())
+        # No error, no crash
+
+    @patch("cas_service.setup._service.questionary")
+    @patch("cas_service.setup._service.Path")
+    @patch("cas_service.setup._service.os.path.isdir", return_value=True)
+    @patch("cas_service.setup._service.os.path.isfile", return_value=True)
+    @patch("cas_service.setup._service.os.path.isabs", return_value=True)
+    @patch(
+        "cas_service.setup._service.get_key",
+        return_value="/media/sam/3TB-WDC/matlab2025/bin/matlab",
+    )
+    def test_skips_when_user_declines(
+        self, mock_key, mock_isabs, mock_isfile, mock_isdir, mock_path, mock_q
+    ):
+        """Skips volume mount when user declines."""
+        mock_q.confirm.return_value.ask.return_value = False
+        mock_path_inst = MagicMock()
+        mock_path_inst.resolve.return_value.parent.parent = Path(
+            "/media/sam/3TB-WDC/matlab2025"
+        )
+        mock_path.return_value = mock_path_inst
+
+        from cas_service.setup._service import ServiceStep
+
+        ServiceStep._maybe_enable_matlab_volume(_console())
+        # No file written
 
 
 # ===========================================================================

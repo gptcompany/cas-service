@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 
@@ -11,12 +12,46 @@ from rich.console import Console
 
 from pathlib import Path
 
-from cas_service.setup._config import DEFAULT_CAS_PORT
+from cas_service.setup._config import DEFAULT_CAS_PORT, get_key
 
 PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 UNIT_FILE_SRC = os.path.join(PROJECT_ROOT, "cas-service.service")
 UNIT_FILE_DST = "/etc/systemd/system/cas-service.service"
 COMPOSE_FILE = os.path.join(PROJECT_ROOT, "docker-compose.yml")
+
+# Container-side MATLAB mount point (matches docker-compose.yml volumes)
+_DOCKER_MATLAB_MOUNT = "/opt/matlab"
+
+
+def _enable_matlab_volume(compose_text: str, matlab_root: str) -> str:
+    """Enable MATLAB volume mount in docker-compose.yml content.
+
+    Handles two cases:
+    1. Commented-out volumes section → uncomment and set path
+    2. No volumes section → insert after healthcheck block
+    """
+    volume_line = f"      - {matlab_root}:{_DOCKER_MATLAB_MOUNT}:ro"
+
+    # Case 1: uncomment existing commented volumes
+    pattern = re.compile(
+        r"^(\s*)#\s*volumes:\s*\n\s*#\s*-\s*[^\n]*matlab[^\n]*$",
+        re.MULTILINE | re.IGNORECASE,
+    )
+    match = pattern.search(compose_text)
+    if match:
+        indent = match.group(1) or "    "
+        replacement = f"{indent}volumes:\n{volume_line}"
+        return compose_text[: match.start()] + replacement + compose_text[match.end() :]
+
+    # Case 2: insert volumes after restart line
+    restart_match = re.search(r"^(\s*)restart:.*$", compose_text, re.MULTILINE)
+    if restart_match:
+        indent = restart_match.group(1) or "    "
+        insert = f"\n{indent}volumes:\n{volume_line}"
+        pos = restart_match.end()
+        return compose_text[:pos] + insert + compose_text[pos:]
+
+    return compose_text
 
 
 class ServiceStep:
@@ -158,6 +193,9 @@ class ServiceStep:
             console.print(f"  [red]docker-compose.yml not found: {COMPOSE_FILE}[/]")
             return False
 
+        # Check if MATLAB is configured and offer volume mount
+        self._maybe_enable_matlab_volume(console)
+
         console.print("  Building Docker image...")
         try:
             subprocess.run(
@@ -250,6 +288,70 @@ class ServiceStep:
         console.print("    CAS_LOG_LEVEL=INFO")
         console.print()
         return True
+
+    # ------------------------------------------------------------------
+    # Docker MATLAB volume
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _maybe_enable_matlab_volume(console: Console) -> None:
+        """If MATLAB is configured on host, offer to enable Docker volume mount."""
+        matlab_path = get_key("CAS_MATLAB_PATH")
+        if not matlab_path:
+            return
+
+        # Resolve the MATLAB root (e.g. /media/sam/3TB-WDC/matlab2025 from .../bin/matlab)
+        resolved = (
+            shutil.which(matlab_path) if not os.path.isabs(matlab_path) else matlab_path
+        )
+        if not resolved or not os.path.isfile(resolved):
+            return
+
+        matlab_root = str(Path(resolved).resolve().parent.parent)
+        if not os.path.isdir(matlab_root):
+            return
+
+        console.print(f"  [cyan]MATLAB detected on host:[/] {matlab_root}")
+        console.print("  Docker containers cannot access host paths directly.")
+        enable = questionary.confirm(
+            f"  Mount {matlab_root} into container at {_DOCKER_MATLAB_MOUNT}?",
+            default=True,
+        ).ask()
+        if not enable:
+            console.print(
+                "  [yellow]Skipping MATLAB mount — MATLAB won't be available in Docker.[/]"
+            )
+            return
+
+        # Enable volume mount in docker-compose.yml
+        compose_text = Path(COMPOSE_FILE).read_text()
+        container_matlab_bin = f"{_DOCKER_MATLAB_MOUNT}/bin/matlab"
+
+        if f"{matlab_root}:{_DOCKER_MATLAB_MOUNT}" in compose_text:
+            console.print("  [dim]MATLAB volume already configured.[/]")
+        else:
+            # Replace commented volume section or add new one
+            updated = _enable_matlab_volume(compose_text, matlab_root)
+            if updated != compose_text:
+                Path(COMPOSE_FILE).write_text(updated)
+                console.print(
+                    f"  [green]Enabled volume:[/] {matlab_root} -> {_DOCKER_MATLAB_MOUNT}"
+                )
+            else:
+                console.print("  [yellow]Could not auto-edit docker-compose.yml.[/]")
+                console.print(
+                    f"  Add manually under services.cas-service:\n"
+                    f"    volumes:\n"
+                    f"      - {matlab_root}:{_DOCKER_MATLAB_MOUNT}:ro"
+                )
+
+        # Update CAS_MATLAB_PATH to container-side path
+        from cas_service.setup._config import write_key
+
+        write_key("CAS_MATLAB_PATH", container_matlab_bin)
+        console.print(
+            f"  [green]Set CAS_MATLAB_PATH={container_matlab_bin}[/] (container path)"
+        )
 
     # ------------------------------------------------------------------
     # Helpers
