@@ -7,7 +7,13 @@ metadata:
     Multi-engine Computer Algebra System microservice for formula validation and
     compute using SymPy, SageMath, and optional MATLAB/WolframAlpha.
   annotations:
+    backstage.io/techdocs-ref: dir:.
     github.com/project-slug: gptcompany/cas-service
+    github.com/workflows-folder: .github/workflows
+  links:
+    - url: https://github.com/gptcompany/cas-service
+      title: GitHub
+      icon: github
   tags:
     - python
     - cas
