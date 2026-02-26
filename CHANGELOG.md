@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.0.2 (2026-02-26)
+
+### Bug Fixes
+
+- **docs**: Replace broken tokei.rs LOC badge with sloc.xyz
+  ([`25918d5`](https://github.com/gptcompany/cas-service/commit/25918d566980b954d190e357db4397c44c61fd5c))
+
+### Testing
+
+- Add coverage tests for sage, wolframalpha, service, verify (345 passing)
+  ([`4265a02`](https://github.com/gptcompany/cas-service/commit/4265a020eb9eb3356e0efd436bfa31f720fcbf44))
+
+
 ## v1.0.1 (2026-02-26)
 
 ### Bug Fixes
