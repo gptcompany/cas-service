@@ -8,7 +8,7 @@
 ![License](https://img.shields.io/github/license/gptcompany/cas-service?style=flat-square)
 ![Last Commit](https://img.shields.io/github/last-commit/gptcompany/cas-service?style=flat-square)
 ![Issues](https://img.shields.io/github/issues/gptcompany/cas-service?style=flat-square)
-![Lines of Code](https://tokei.rs/b1/github/gptcompany/cas-service?style=flat-square)
+![Lines of Code](https://sloc.xyz/github/gptcompany/cas-service)
 
 Multi-engine Computer Algebra System microservice. Validates mathematical formulas using SymPy, SageMath, and optionally MATLAB with consensus-based verification. Supports template-based compute via SymPy (6 templates), SageMath (11 templates, incl. group theory), MATLAB (4 templates), and WolframAlpha (3 templates). Engines run in parallel for validation.
 
