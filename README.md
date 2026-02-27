@@ -212,7 +212,7 @@ Stop: `docker compose down`
 ### systemd
 
 ```bash
-cas-setup service       # Generates cas-service.service
+cas-setup service       # Renders + installs cas-service.service for this machine
 sudo systemctl enable cas-service
 sudo systemctl start cas-service
 ```

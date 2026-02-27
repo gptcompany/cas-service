@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import getpass
 import os
 import re
 import shutil
 import subprocess
+import tempfile
 
 import questionary
 from rich.console import Console
@@ -21,6 +23,24 @@ COMPOSE_FILE = os.path.join(PROJECT_ROOT, "docker-compose.yml")
 
 # Container-side MATLAB mount point (matches docker-compose.yml volumes)
 _DOCKER_MATLAB_MOUNT = "/opt/matlab"
+
+
+def _render_systemd_unit(template: str) -> str:
+    """Render cas-service.service template with local paths and current user."""
+    user = getpass.getuser()
+    venv_python = Path(PROJECT_ROOT) / ".venv" / "bin" / "python"
+    exec_start = f"{venv_python} -m cas_service.main"
+
+    rendered = template.replace("User=your-username", f"User={user}")
+    rendered = rendered.replace(
+        "WorkingDirectory=/path/to/cas-service",
+        f"WorkingDirectory={PROJECT_ROOT}",
+    )
+    rendered = rendered.replace(
+        "ExecStart=/usr/local/bin/uv run python -m cas_service.main",
+        f"ExecStart={exec_start}",
+    )
+    return rendered
 
 
 def _enable_matlab_volume(compose_text: str, matlab_root: str) -> str:
@@ -154,10 +174,25 @@ class ServiceStep:
             console.print("  Use foreground mode instead.")
             return False
 
-        console.print(f"  Copying {UNIT_FILE_SRC} -> {UNIT_FILE_DST}")
+        console.print("  Rendering unit file with local user/path...")
         try:
+            template = Path(UNIT_FILE_SRC).read_text()
+            rendered = _render_systemd_unit(template)
+            tmp = tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=".service",
+                delete=False,
+                encoding="utf-8",
+            )
+            try:
+                tmp.write(rendered)
+                tmp.flush()
+            finally:
+                tmp.close()
+
+            console.print(f"  Copying rendered unit -> {UNIT_FILE_DST}")
             subprocess.run(
-                ["sudo", "cp", UNIT_FILE_SRC, UNIT_FILE_DST],
+                ["sudo", "cp", tmp.name, UNIT_FILE_DST],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -196,6 +231,12 @@ class ServiceStep:
         except Exception as exc:
             console.print(f"  [red]Error: {exc}[/]")
             return False
+        finally:
+            try:
+                if "tmp" in locals():
+                    os.unlink(tmp.name)
+            except OSError:
+                pass
 
     # ------------------------------------------------------------------
     # Docker Compose

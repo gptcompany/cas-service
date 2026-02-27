@@ -152,3 +152,23 @@ class TestServiceStepExtra:
             assert step.verify() is True
         with patch("cas_service.setup._service.ServiceStep._is_docker_running", return_value=False):
             assert step.verify() is False
+
+
+class TestSystemdTemplateRendering:
+    def test_render_systemd_unit_replaces_placeholders(self):
+        from cas_service.setup._service import PROJECT_ROOT, _render_systemd_unit
+
+        template = (
+            "User=your-username\n"
+            "WorkingDirectory=/path/to/cas-service\n"
+            "ExecStart=/usr/local/bin/uv run python -m cas_service.main\n"
+        )
+        with patch("cas_service.setup._service.getpass.getuser", return_value="sam"):
+            rendered = _render_systemd_unit(template)
+
+        assert "User=sam" in rendered
+        assert f"WorkingDirectory={PROJECT_ROOT}" in rendered
+        assert (
+            f"ExecStart={PROJECT_ROOT}/.venv/bin/python -m cas_service.main"
+            in rendered
+        )
