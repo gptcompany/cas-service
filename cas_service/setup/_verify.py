@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import urllib.error
 import urllib.request
 
@@ -51,8 +53,13 @@ class VerifyStep:
             )
             console.print()
             console.print("  Start it with:")
+            if shutil.which("docker") and os.path.isfile("docker-compose.yml"):
+                console.print("    docker compose up -d")
+                console.print("  Or (with dotenvx):")
+                console.print("    dotenvx run -f .env -- docker compose up -d")
+                console.print("  Or:")
             console.print("    uv run python -m cas_service.main")
-            console.print("  Or:")
+            console.print("  Or (Linux systemd):")
             console.print("    sudo systemctl start cas-service")
             return False
 
