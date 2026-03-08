@@ -14,7 +14,7 @@ from rich.console import Console
 
 from pathlib import Path
 
-from cas_service.setup._config import DEFAULT_CAS_PORT, get_key
+from cas_service.setup._config import DEFAULT_CAS_PORT, get_cas_port, get_key, set_cas_port
 
 PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 UNIT_FILE_SRC = os.path.join(PROJECT_ROOT, "cas-service.service")
@@ -123,6 +123,9 @@ class ServiceStep:
             self._mode = "foreground"
             return self._show_foreground(console)
 
+        if not self._configure_port(console):
+            return False
+
         console.print("  Deployment options:")
         if has_systemd:
             console.print(
@@ -149,6 +152,45 @@ class ServiceStep:
         if self._mode and self._mode.startswith("docker"):
             return self._install_docker(console)
         return self._show_foreground(console)
+
+    @staticmethod
+    def _configure_port(console: Console) -> bool:
+        current = get_cas_port()
+        default_choice = f"Use default port ({DEFAULT_CAS_PORT})"
+        custom_choice = f"Use custom port (current: {current})"
+        port_choice = questionary.select(
+            "CAS service port configuration:",
+            choices=[default_choice, custom_choice],
+            default=custom_choice if current != DEFAULT_CAS_PORT else default_choice,
+        ).ask()
+        if port_choice is None:
+            console.print("  [yellow]Port selection cancelled.[/]")
+            return False
+
+        if port_choice == default_choice:
+            if not set_cas_port(DEFAULT_CAS_PORT):
+                console.print("  [red]Failed to set default CAS_PORT.[/]")
+                return False
+            console.print(f"  [green]CAS_PORT set to default {DEFAULT_CAS_PORT}[/]")
+            return True
+
+        custom_raw = questionary.text(
+            "Enter CAS port (1-65535):",
+            default=str(current),
+        ).ask()
+        if custom_raw is None:
+            console.print("  [yellow]Port input cancelled.[/]")
+            return False
+        try:
+            custom_port = int(custom_raw.strip())
+        except ValueError:
+            console.print("  [red]Invalid port. Must be an integer 1-65535.[/]")
+            return False
+        if not set_cas_port(custom_port):
+            console.print("  [red]Invalid port. Must be between 1 and 65535.[/]")
+            return False
+        console.print(f"  [green]CAS_PORT set to {custom_port}[/]")
+        return True
 
     def verify(self) -> bool:
         """Verify the chosen deployment is configured."""

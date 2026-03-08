@@ -6,6 +6,8 @@ Usage:
     cas-setup configure  # Re-configure engine paths and API keys
     cas-setup service    # Configure service deployment
     cas-setup verify     # Verify running service health + engines
+    cas-setup get        # Show config values (or one key)
+    cas-setup set        # Set config values (e.g., CAS_PORT)
 """
 
 from __future__ import annotations
@@ -120,27 +122,90 @@ SUBCOMMANDS = {
     "configure": (_configure_steps, "Re-configure engine paths and API keys"),
     "service": (_service_steps, "Configure service deployment"),
     "verify": (_verify_steps, "Verify running service health + engine smoke tests"),
+    "get": (None, "Show configuration values (e.g., 'cas-setup get CAS_PORT')"),
+    "set": (None, "Set configuration value (e.g., 'cas-setup set CAS_PORT 8870')"),
 }
 
 
-def main(args: list[str] | None = None) -> None:
+def _handle_get(args: list[str], console: Console) -> int:
+    from cas_service.setup._config import get_key
+    from rich.table import Table
+
+    known = [
+        "CAS_PORT",
+        "CAS_MATLAB_PATH",
+        "CAS_SAGE_PATH",
+        "CAS_WOLFRAMALPHA_APPID",
+        "CAS_LOG_LEVEL",
+    ]
+
+    if not args:
+        table = Table(title="CAS Configuration", show_lines=False)
+        table.add_column("Key", style="bold")
+        table.add_column("Value")
+        for key in known:
+            val = get_key(key)
+            table.add_row(key, val or "[dim]not set[/]")
+        console.print(table)
+        return 0
+
+    key = args[0]
+    val = get_key(key)
+    if val:
+        print(val)
+        return 0
+    console.print(f"[red]Error:[/] Key '{key}' not found or not set.")
+    return 1
+
+
+def _handle_set(args: list[str], console: Console) -> int:
+    from cas_service.setup._config import parse_cas_port, set_cas_port, write_key
+
+    if len(args) < 2:
+        console.print("[red]Usage:[/] cas-setup set <KEY> <VALUE>")
+        return 1
+
+    key, value = args[0], args[1]
+    if key == "CAS_PORT":
+        parsed = parse_cas_port(value)
+        if parsed is None:
+            console.print(f"[red]Error:[/] Invalid port (1-65535): {value}")
+            return 1
+        if not set_cas_port(parsed):
+            console.print("[red]Failed to set CAS_PORT[/]")
+            return 1
+        console.print(f"[green]Successfully set CAS_PORT={parsed}[/]")
+        return 0
+
+    write_key(key, value)
+    console.print(f"[green]Successfully set {key}={value}[/]")
+    return 0
+
+
+def main(args: list[str] | None = None) -> int:
     """CLI entry point for the setup wizard."""
     console = Console()
     console.print(BANNER, style="bold cyan")
 
     argv = args if args is not None else sys.argv[1:]
 
-    if len(argv) > 1 or (len(argv) == 1 and argv[0] in ("-h", "--help")):
+    if len(argv) == 1 and argv[0] in ("-h", "--help", "help"):
         console.print("Usage: cas-setup [SUBCOMMAND]")
         console.print()
         console.print("Subcommands:")
         console.print("  (none)     Run all setup steps")
+        console.print("  get [KEY]  Show config values")
+        console.print("  set <KEY> <VALUE>  Set config value")
         for name, (_, desc) in SUBCOMMANDS.items():
+            if name in {"get", "set"}:
+                continue
             console.print(f"  {name:<10} {desc}")
-        return
+        return 0
 
     if len(argv) == 1:
         subcmd = argv[0]
+        if subcmd == "get":
+            return _handle_get([], console)
         if subcmd not in SUBCOMMANDS:
             console.print(
                 f"[red]Unknown subcommand: {subcmd}[/]  "
@@ -148,10 +213,22 @@ def main(args: list[str] | None = None) -> None:
             )
             sys.exit(1)
         factory, description = SUBCOMMANDS[subcmd]
+        if subcmd == "set":
+            console.print("[red]Usage:[/] cas-setup set <KEY> <VALUE>")
+            return 1
+        if factory is None:
+            return 1
         console.print(f"[bold]{description}[/]")
         console.print()
         steps = factory()
         success = run_steps(steps, console)
+    elif len(argv) >= 2 and argv[0] == "get":
+        return _handle_get(argv[1:], console)
+    elif len(argv) >= 3 and argv[0] == "set":
+        return _handle_set(argv[1:], console)
+    elif len(argv) >= 1 and argv[0] == "set":
+        console.print("[red]Usage:[/] cas-setup set <KEY> <VALUE>")
+        return 1
     else:
         _print_welcome(console)
         steps = _all_steps()
@@ -159,7 +236,8 @@ def main(args: list[str] | None = None) -> None:
     if not success:
         sys.exit(1)
     console.print("[bold green]Setup complete.[/]")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

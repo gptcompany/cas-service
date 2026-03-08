@@ -72,6 +72,25 @@ def get_cas_port(default: int = DEFAULT_CAS_PORT) -> int:
     return port
 
 
+def parse_cas_port(raw: str) -> int | None:
+    """Parse and validate a CAS port value."""
+    try:
+        port = int(raw.strip())
+    except (ValueError, AttributeError):
+        return None
+    if not (1 <= port <= 65535):
+        return None
+    return port
+
+
+def set_cas_port(port: int) -> bool:
+    """Persist CAS_PORT in .env after validation."""
+    if not (1 <= port <= 65535):
+        return False
+    write_key("CAS_PORT", str(port))
+    return True
+
+
 def get_service_url(host: str = DEFAULT_CAS_HOST) -> str:
     """Return the local CAS base URL using the configured CAS_PORT."""
     return f"http://{host}:{get_cas_port()}"
