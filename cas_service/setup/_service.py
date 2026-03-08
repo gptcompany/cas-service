@@ -143,10 +143,20 @@ class ServiceStep:
         console.print(
             "    [bold]foreground[/] — runs in terminal (for testing / development)"
         )
+        if has_docker:
+            console.print(
+                "  [green]Recommended default for most users: docker compose[/]"
+            )
         console.print()
+        default_mode = (
+            "docker compose"
+            if has_docker
+            else ("systemd (recommended)" if has_systemd else "foreground")
+        )
         self._mode = questionary.select(
             "How do you want to run the CAS service?",
             choices=choices,
+            default=default_mode,
         ).ask()
         if self._mode is None:
             console.print("  [yellow]Selection cancelled.[/]")
@@ -303,7 +313,6 @@ class ServiceStep:
             subprocess.run(
                 ["docker", "compose", "build"],
                 check=True,
-                capture_output=True,
                 text=True,
                 cwd=PROJECT_ROOT,
                 timeout=600,
@@ -349,7 +358,6 @@ class ServiceStep:
             subprocess.run(
                 cmd,
                 check=True,
-                capture_output=True,
                 text=True,
                 cwd=PROJECT_ROOT,
                 env=run_env,
