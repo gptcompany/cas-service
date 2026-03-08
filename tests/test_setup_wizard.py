@@ -453,9 +453,10 @@ class TestServiceStep:
     @patch(
         "cas_service.setup._service.ServiceStep._is_docker_running", return_value=False
     )
+    @patch("cas_service.setup._service.ServiceStep._health_ok", return_value=True)
     @patch("cas_service.setup._service.subprocess.run")
     @patch("cas_service.setup._service.os.path.isfile", return_value=True)
-    def test_check_enabled(self, mock_isfile, mock_run, _mock_docker):
+    def test_check_enabled(self, mock_isfile, mock_run, _mock_health, _mock_docker):
         """check() returns True when unit file exists and service is enabled."""
         mock_run.return_value = _completed(0, stdout="enabled\n")
         step = self._make()

@@ -89,8 +89,9 @@ class ServiceStep:
 
     def check(self) -> bool:
         """Return True if a deployment is already configured."""
-        # Check Docker first
-        if self._is_docker_running():
+        # Deployment is considered configured only if it is also reachable on
+        # the currently configured CAS_PORT.
+        if self._is_docker_running() and self._health_ok():
             return True
         # Then systemd
         if not os.path.isfile(UNIT_FILE_DST):
@@ -102,7 +103,7 @@ class ServiceStep:
                 text=True,
                 timeout=10,
             )
-            return result.stdout.strip() == "enabled"
+            return result.stdout.strip() == "enabled" and self._health_ok()
         except Exception:
             return False
 
