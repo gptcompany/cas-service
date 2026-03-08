@@ -79,9 +79,21 @@ class TestSageStep:
     @patch("cas_service.setup._sage.subprocess.run")
     @patch("cas_service.setup._sage.shutil.which")
     @patch("cas_service.setup._sage.SageStep._find_sage", return_value=None)
+    def test_install_port_success(self, mock_find, mock_which, mock_run):
+        """install() attempts MacPorts install on macOS when available."""
+        mock_which.side_effect = lambda x: "/opt/local/bin/port" if x == "port" else (None if x in {"apt-get", "brew"} else ("/opt/local/bin/sage" if x == "sage" else None))
+        mock_run.return_value = _completed(0)
+
+        step = self._make()
+        assert step.install(_console()) is True
+        assert step._found_path == "/opt/local/bin/sage"
+
+    @patch("cas_service.setup._sage.subprocess.run")
+    @patch("cas_service.setup._sage.shutil.which")
+    @patch("cas_service.setup._sage.SageStep._find_sage", return_value=None)
     def test_install_brew_success(self, mock_find, mock_which, mock_run):
         """install() attempts brew install on macOS if sage missing."""
-        mock_which.side_effect = lambda x: "/usr/local/bin/brew" if x == "brew" else (None if x == "apt-get" else ("/usr/local/bin/sage" if x == "sage" else None))
+        mock_which.side_effect = lambda x: "/usr/local/bin/brew" if x == "brew" else (None if x in {"apt-get", "port"} else ("/usr/local/bin/sage" if x == "sage" else None))
         mock_run.return_value = _completed(0)
         
         step = self._make()

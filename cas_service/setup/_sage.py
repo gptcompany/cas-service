@@ -34,7 +34,7 @@ class SageStep:
     """Detect, install, and configure SageMath."""
 
     name = "SageMath"
-    description = "Find or install SageMath (apt/brew)"
+    description = "Find or install SageMath (apt/port/brew)"
 
     def __init__(self) -> None:
         self._found_path: str | None = None
@@ -65,7 +65,7 @@ class SageStep:
             console.print(f"  Saved CAS_SAGE_PATH={path} to .env")
             return True
 
-        # Offer auto-install: apt on Linux, brew on macOS
+        # Offer auto-install: apt on Linux, MacPorts on macOS (preferred), brew fallback.
         if shutil.which("apt-get"):
             console.print("  SageMath not found. Attempting auto-install via apt...")
             console.print("  [dim](This may take a few minutes — ~2GB download)[/]")
@@ -84,6 +84,26 @@ class SageStep:
                         console.print(f"  [green]SageMath installed at {path}[/]")
                         return True
                 console.print(f"  [red]apt install failed:[/] {result.stderr[:200]}")
+            except Exception as exc:
+                console.print(f"  [red]Auto-install failed: {exc}[/]")
+        elif shutil.which("port"):
+            console.print("  SageMath not found. Attempting auto-install via MacPorts...")
+            console.print("  [dim](This may take a while — large download)[/]")
+            try:
+                result = subprocess.run(
+                    ["sudo", "port", "install", "sagemath"],
+                    capture_output=True,
+                    text=True,
+                    timeout=600,
+                )
+                if result.returncode == 0:
+                    path = shutil.which("sage") or self._find_sage()
+                    if path:
+                        self._found_path = path
+                        write_key("CAS_SAGE_PATH", path)
+                        console.print(f"  [green]SageMath installed at {path}[/]")
+                        return True
+                console.print(f"  [red]port install failed:[/] {result.stderr[:200]}")
             except Exception as exc:
                 console.print(f"  [red]Auto-install failed: {exc}[/]")
         elif shutil.which("brew"):
