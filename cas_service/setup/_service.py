@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import getpass
+import json
 import os
 import re
 import shutil
 import subprocess
 import tempfile
+import time
+import urllib.error
+import urllib.request
 
 import questionary
 from rich.console import Console
@@ -195,9 +199,9 @@ class ServiceStep:
     def verify(self) -> bool:
         """Verify the chosen deployment is configured."""
         if self._mode and self._mode.startswith("systemd"):
-            return self.check()
+            return self._health_ok()
         if self._mode and self._mode.startswith("docker"):
-            return self._is_docker_running()
+            return self._is_docker_running() and self._health_ok()
         # Foreground mode always "verifies" — user just runs the command
         return True
 
@@ -337,6 +341,9 @@ class ServiceStep:
             console.print("  Starting container...")
             cmd = ["docker", "compose", "up", "-d"]
 
+        run_env = os.environ.copy()
+        run_env["CAS_PORT"] = str(get_cas_port())
+
         try:
             subprocess.run(
                 cmd,
@@ -344,9 +351,28 @@ class ServiceStep:
                 capture_output=True,
                 text=True,
                 cwd=PROJECT_ROOT,
+                env=run_env,
                 timeout=60,
             )
             console.print("  [green]Docker container started.[/]")
+            if not self._wait_health(timeout_s=45):
+                console.print(
+                    f"  [red]CAS /health is not reachable on configured port {get_cas_port()} after startup.[/]"
+                )
+                try:
+                    logs = subprocess.run(
+                        ["docker", "compose", "logs", "--tail", "80"],
+                        capture_output=True,
+                        text=True,
+                        cwd=PROJECT_ROOT,
+                        timeout=20,
+                    )
+                    if logs.returncode == 0 and logs.stdout.strip():
+                        console.print("  [yellow]Recent container logs:[/]")
+                        console.print(logs.stdout[-2000:])
+                except Exception:
+                    pass
+                return False
             console.print()
             console.print("  Useful commands:")
             console.print(f"    [bold]cd {PROJECT_ROOT}[/]")
@@ -361,6 +387,26 @@ class ServiceStep:
             stderr = exc.stderr or ""
             console.print(f"  [red]Docker start failed:[/] {stderr[:300]}")
             return False
+
+    @staticmethod
+    def _health_ok() -> bool:
+        port = get_cas_port()
+        url = f"http://localhost:{port}/health"
+        try:
+            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode())
+            return data.get("status") == "ok"
+        except (urllib.error.URLError, OSError, json.JSONDecodeError, Exception):
+            return False
+
+    def _wait_health(self, timeout_s: int = 45) -> bool:
+        start = time.time()
+        while time.time() - start < timeout_s:
+            if self._health_ok():
+                return True
+            time.sleep(2)
+        return False
 
     # ------------------------------------------------------------------
     # Foreground

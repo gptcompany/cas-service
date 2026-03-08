@@ -567,11 +567,9 @@ class TestServiceStep:
 
     # -- verify --------------------------------------------------------------
 
-    @patch("cas_service.setup._service.subprocess.run")
-    @patch("cas_service.setup._service.os.path.isfile", return_value=True)
-    def test_verify_systemd_mode(self, mock_isfile, mock_run):
-        """verify() delegates to check() in systemd mode."""
-        mock_run.return_value = _completed(0, stdout="enabled\n")
+    @patch("cas_service.setup._service.ServiceStep._health_ok", return_value=True)
+    def test_verify_systemd_mode(self, _mock_health):
+        """verify() checks /health in systemd mode."""
         step = self._make()
         step._mode = "systemd (recommended)"
         assert step.verify() is True

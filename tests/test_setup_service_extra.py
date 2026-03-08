@@ -40,7 +40,8 @@ class TestServiceStepExtra:
         mock_run.return_value = _completed(0)
         
         step = self._make()
-        with patch("cas_service.setup._service.ServiceStep._maybe_enable_matlab_volume"):
+        with patch("cas_service.setup._service.ServiceStep._maybe_enable_matlab_volume"), \
+             patch("cas_service.setup._service.ServiceStep._wait_health", return_value=True):
             assert step._install_docker(_console()) is True
         
         # 1. docker compose build
@@ -60,7 +61,8 @@ class TestServiceStepExtra:
         mock_run.return_value = _completed(0)
         
         step = self._make()
-        with patch("cas_service.setup._service.ServiceStep._maybe_enable_matlab_volume"):
+        with patch("cas_service.setup._service.ServiceStep._maybe_enable_matlab_volume"), \
+             patch("cas_service.setup._service.ServiceStep._wait_health", return_value=True):
             assert step._install_docker(_console()) is True
         
         args1 = mock_run.call_args_list[1][0][0]
@@ -86,7 +88,8 @@ class TestServiceStepExtra:
         ]
         
         step = self._make()
-        with patch("cas_service.setup._service.ServiceStep._maybe_enable_matlab_volume"):
+        with patch("cas_service.setup._service.ServiceStep._maybe_enable_matlab_volume"), \
+             patch("cas_service.setup._service.ServiceStep._wait_health", return_value=True):
             assert step._install_docker(_console()) is False
 
     # -- Systemd edge cases --------------------------------------------------
@@ -145,12 +148,14 @@ class TestServiceStepExtra:
     # -- verify docker -------------------------------------------------------
 
     def test_verify_docker_mode(self):
-        """verify() calls _is_docker_running in docker mode."""
+        """verify() requires both docker running and /health OK in docker mode."""
         step = self._make()
         step._mode = "docker compose"
-        with patch("cas_service.setup._service.ServiceStep._is_docker_running", return_value=True):
+        with patch("cas_service.setup._service.ServiceStep._is_docker_running", return_value=True), \
+             patch("cas_service.setup._service.ServiceStep._health_ok", return_value=True):
             assert step.verify() is True
-        with patch("cas_service.setup._service.ServiceStep._is_docker_running", return_value=False):
+        with patch("cas_service.setup._service.ServiceStep._is_docker_running", return_value=False), \
+             patch("cas_service.setup._service.ServiceStep._health_ok", return_value=True):
             assert step.verify() is False
 
 
