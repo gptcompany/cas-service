@@ -53,6 +53,8 @@ def write_key(key: str, value: str) -> None:
 def get_key(key: str) -> str | None:
     """Get a single key value, checking .env then os.environ."""
     config = read_config()
+    if key in os.environ:
+        return os.environ[key]
     if key in config:
         return config[key]
     return os.environ.get(key) or None

@@ -54,10 +54,10 @@ class TestSetupConfig:
         monkeypatch.setenv("CAS_PORT", "7777")
         assert setup_config.get_key("CAS_PORT") == "7777"
 
-    def test_get_key_prefers_dotenv_even_when_empty(self, temp_env_file, monkeypatch):
+    def test_get_key_prefers_os_environ(self, temp_env_file, monkeypatch):
         temp_env_file.write_text("CAS_WOLFRAMALPHA_APPID=\n")
         monkeypatch.setenv("CAS_WOLFRAMALPHA_APPID", "ENV-SET")
-        assert setup_config.get_key("CAS_WOLFRAMALPHA_APPID") == ""
+        assert setup_config.get_key("CAS_WOLFRAMALPHA_APPID") == "ENV-SET"
 
     def test_get_cas_port_uses_configured_value(self, temp_env_file):
         temp_env_file.write_text("CAS_PORT=9012\n")
