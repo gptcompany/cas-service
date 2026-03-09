@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 import time
@@ -201,6 +202,20 @@ class ServiceStep:
         except ValueError:
             console.print("  [red]Invalid port. Must be an integer 1-65535.[/]")
             return False
+        if ServiceStep._port_in_use(custom_port):
+            console.print(
+                f"  [yellow]Port {custom_port} appears to be already in use.[/]"
+            )
+            if ServiceStep._looks_like_cas_on_port(custom_port):
+                console.print(
+                    "  [dim]Detected a CAS-like /health endpoint on that port.[/]"
+                )
+            if not questionary.confirm(
+                f"Use port {custom_port} anyway?",
+                default=False,
+            ).ask():
+                console.print("  [yellow]Choose another port and retry.[/]")
+                return False
         if not set_cas_port(custom_port):
             console.print("  [red]Invalid port. Must be between 1 and 65535.[/]")
             return False
@@ -522,6 +537,30 @@ class ServiceStep:
                 timeout=10,
             )
             return result.returncode == 0
+        except Exception:
+            return False
+
+    @staticmethod
+    def _port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind((host, port))
+                return False
+            except OSError:
+                return True
+
+    @staticmethod
+    def _looks_like_cas_on_port(port: int) -> bool:
+        try:
+            req = urllib.request.Request(
+                f"http://localhost:{port}/health",
+                headers={"Accept": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                data = json.loads(resp.read().decode())
+            service = str(data.get("service", "")).lower()
+            return data.get("status") == "ok" and "cas" in service
         except Exception:
             return False
 

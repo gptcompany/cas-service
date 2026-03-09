@@ -18,12 +18,17 @@ class SetupStep(Protocol):
     def verify(self) -> bool: ...
 
 
-def _run_single_step(step: SetupStep, console: Console) -> str:
+def _run_single_step(step: SetupStep, console: Console, *, force_run: bool = False) -> str:
     """Execute a single step and return a status string."""
     with console.status(f"[bold cyan]Checking {step.name}...[/]"):
-        if step.check():
+        already_ok = step.check()
+    if already_ok and not force_run:
             console.print(f"  [green]ok[/] {step.name} — already configured")
             return "ok"
+    if already_ok and force_run:
+        console.print(
+            f"  [green]ok[/] {step.name} — already configured (re-running by user request)"
+        )
 
     confirm = questionary.confirm(f"Configure {step.name}?", default=True).ask()
     if confirm is None:
@@ -159,7 +164,7 @@ def run_interactive_menu(steps: list[SetupStep], console: Console) -> bool:
                 continue
 
             step = steps[int(selected)]
-            status = _run_single_step(step, console)
+            status = _run_single_step(step, console, force_run=True)
             if status == "abort":
                 console.print("  [yellow]Step aborted — back to menu.[/]")
             else:
