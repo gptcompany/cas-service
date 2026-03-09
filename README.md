@@ -28,6 +28,8 @@ Subcommands (kept as linear flows): `cas-setup engines | configure | service | v
 Practical notes:
 - Optional steps (for example MATLAB or WolframAlpha) may be marked `Skipped` and do not fail the wizard.
 - `cas-setup` exits `0` when all remaining steps are `OK` / `Skipped` / `Warning`; exits `1` on abort or unresolved `Pending` / `Failed` steps.
+- In interactive mode you can re-run a step even when it is already `OK` (manual selection).
+- Custom port selection now checks if the port is already in use before applying it.
 
 ## Manual Setup
 
