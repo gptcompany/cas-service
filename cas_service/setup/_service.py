@@ -216,6 +216,8 @@ class ServiceStep:
             ).ask():
                 console.print("  [yellow]Choose another port and retry.[/]")
                 return False
+        else:
+            console.print(f"  [green]Port {custom_port} is free.[/]")
         if not set_cas_port(custom_port):
             console.print("  [red]Invalid port. Must be between 1 and 65535.[/]")
             return False
