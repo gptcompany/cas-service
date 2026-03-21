@@ -1,0 +1,83 @@
+name: Deploy Self-Hosted
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cas-service-self-hosted
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: [self-hosted, Linux, X64, muletto]
+    env:
+      DEPLOY_ROOT: ${{ vars.CAS_DEPLOY_ROOT }}
+      SERVICE_USER: ${{ vars.CAS_SERVICE_USER }}
+      ENV_FILE: ${{ vars.CAS_ENV_FILE }}
+      CAS_PORT: ${{ vars.CAS_PORT }}
+      CAS_LOG_LEVEL: ${{ vars.CAS_LOG_LEVEL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Resolve deploy settings
+        shell: bash
+        run: |
+          echo "DEPLOY_ROOT=${DEPLOY_ROOT:-/media/sam/1TB/cas-service}" >> "$GITHUB_ENV"
+          echo "SERVICE_USER=${SERVICE_USER:-$(id -un)}" >> "$GITHUB_ENV"
+          echo "ENV_FILE=${ENV_FILE:-${DEPLOY_ROOT:-/media/sam/1TB/cas-service}/.env}" >> "$GITHUB_ENV"
+          echo "CAS_PORT=${CAS_PORT:-8769}" >> "$GITHUB_ENV"
+          echo "CAS_LOG_LEVEL=${CAS_LOG_LEVEL:-INFO}" >> "$GITHUB_ENV"
+
+      - name: Sync working tree to deploy root
+        shell: bash
+        run: |
+          mkdir -p "$DEPLOY_ROOT"
+          rsync -a --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.venv/' \
+            --exclude '__pycache__/' \
+            --exclude '.pytest_cache/' \
+            --exclude '.mypy_cache/' \
+            --exclude '.ruff_cache/' \
+            --filter='P .env' \
+            "$GITHUB_WORKSPACE/" "$DEPLOY_ROOT/"
+          chmod +x "$DEPLOY_ROOT/scripts/cas_service_start.sh" "$DEPLOY_ROOT/update-systemd.sh"
+
+      - name: Sync Python environment
+        shell: bash
+        working-directory: ${{ env.DEPLOY_ROOT }}
+        run: uv sync --extra setup
+
+      - name: Install or restart systemd service
+        shell: bash
+        run: |
+          sudo env \
+            CAS_SERVICE_ROOT="$DEPLOY_ROOT" \
+            CAS_SERVICE_USER="$SERVICE_USER" \
+            CAS_ENV_FILE="$ENV_FILE" \
+            CAS_PORT="$CAS_PORT" \
+            CAS_LOG_LEVEL="$CAS_LOG_LEVEL" \
+            bash "$DEPLOY_ROOT/update-systemd.sh"
+
+      - name: Verify health
+        shell: bash
+        run: curl -fsS "http://localhost:${CAS_PORT}/health"
