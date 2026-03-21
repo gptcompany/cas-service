@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/workflows/notify-pepers-integration.yml"
+      - ".github/workflows/deploy-self-hosted.yml"
+      - "scripts/**"
+      - "update-systemd.sh"
       - "cas_service/**"
       - "tests/**"
       - "pyproject.toml"
@@ -21,20 +25,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Repository dispatch to pepers
+        id: pepers_dispatch
         env:
-          DISPATCH_TOKEN: ${{ secrets.PEPERS_REPO_DISPATCH_TOKEN }}
+          DISPATCH_TOKEN: ${{ secrets.PEPERS_REPO_DISPATCH_TOKEN || secrets.PAT }}
         if: env.DISPATCH_TOKEN != ''
+        continue-on-error: true
         uses: peter-evans/repository-dispatch@v3
         with:
-          token: ${{ secrets.PEPERS_REPO_DISPATCH_TOKEN }}
+          token: ${{ secrets.PEPERS_REPO_DISPATCH_TOKEN || secrets.PAT }}
           repository: gptcompany/pepers
           event-type: cas-service-update
           client-payload: >-
             {"source_repo":"${{ github.repository }}","source_ref":"${{ github.ref_name }}","source_sha":"${{ github.sha }}","source_workflow":"${{ github.workflow }}"}
 
-      - name: Missing token notice
+      - name: Pepers dispatch warning
+        if: steps.pepers_dispatch.outcome == 'failure'
+        run: |
+          echo "::warning::pepers repository_dispatch failed. Check PEPERS_REPO_DISPATCH_TOKEN or PAT validity/scope."
+          echo "pepers repository_dispatch failed. Check PEPERS_REPO_DISPATCH_TOKEN or PAT validity/scope." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Repository dispatch to progressive-deploy
+        id: progressive_dispatch
         env:
-          DISPATCH_TOKEN: ${{ secrets.PEPERS_REPO_DISPATCH_TOKEN }}
+          DISPATCH_TOKEN: ${{ secrets.PROGRESSIVE_DEPLOY_REPO_DISPATCH_TOKEN || secrets.PAT }}
+        if: env.DISPATCH_TOKEN != ''
+        continue-on-error: true
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PROGRESSIVE_DEPLOY_REPO_DISPATCH_TOKEN || secrets.PAT }}
+          repository: gptcompany/progressive-deploy
+          event-type: cas-service-build
+          client-payload: >-
+            {"source_repo":"${{ github.repository }}","source_ref":"${{ github.ref_name }}","source_sha":"${{ github.sha }}","source_workflow":"${{ github.workflow }}","ref":"${{ github.sha }}"}
+
+      - name: Progressive-deploy dispatch warning
+        if: steps.progressive_dispatch.outcome == 'failure'
+        run: |
+          echo "::warning::progressive-deploy repository_dispatch failed. Check PROGRESSIVE_DEPLOY_REPO_DISPATCH_TOKEN or PAT validity/scope."
+          echo "progressive-deploy repository_dispatch failed. Check PROGRESSIVE_DEPLOY_REPO_DISPATCH_TOKEN or PAT validity/scope." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Missing token notice for pepers
+        env:
+          DISPATCH_TOKEN: ${{ secrets.PEPERS_REPO_DISPATCH_TOKEN || secrets.PAT }}
         if: env.DISPATCH_TOKEN == ''
         run: |
-          echo "PEPERS_REPO_DISPATCH_TOKEN is not configured; skipping repository_dispatch." >> "$GITHUB_STEP_SUMMARY"
+          echo "No dispatch token configured (expected PEPERS_REPO_DISPATCH_TOKEN or PAT); skipping pepers repository_dispatch." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Missing token notice for progressive-deploy
+        env:
+          DISPATCH_TOKEN: ${{ secrets.PROGRESSIVE_DEPLOY_REPO_DISPATCH_TOKEN || secrets.PAT }}
+        if: env.DISPATCH_TOKEN == ''
+        run: |
+          echo "No dispatch token configured (expected PROGRESSIVE_DEPLOY_REPO_DISPATCH_TOKEN or PAT); skipping progressive-deploy repository_dispatch." >> "$GITHUB_STEP_SUMMARY"
