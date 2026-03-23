@@ -5,20 +5,22 @@ services:
       - "${CAS_DOCKER_PORT:-8769}:${CAS_DOCKER_PORT:-8769}"
     environment:
       - CAS_PORT=${CAS_DOCKER_PORT:-8769}
-      - CAS_DEFAULT_ENGINE
+      - CAS_DEFAULT_ENGINE=${CAS_DOCKER_DEFAULT_ENGINE:-sage}
       - CAS_SYMPY_TIMEOUT
-      - CAS_SAGE_PATH
+      - CAS_SAGE_PATH=${CAS_DOCKER_SAGE_PATH:-/usr/bin/sage}
       - CAS_SAGE_TIMEOUT
-      - CAS_MATLAB_PATH
+      - CAS_MATLAB_PATH=${CAS_DOCKER_MATLAB_PATH:-/opt/matlab/bin/matlab}
       - CAS_MATLAB_TIMEOUT
       - CAS_WOLFRAMALPHA_APPID
       - CAS_WOLFRAMALPHA_TIMEOUT
       - CAS_LOG_LEVEL
-    # Per MATLAB: decommentare e impostare il path host
-    # volumes:
-    #   - /usr/local/MATLAB:/opt/matlab:ro
+    volumes:
+      - type: bind
+        source: ${CAS_DOCKER_MATLAB_HOST_PATH:-/media/sam/3TB-WDC/matlab2025}
+        target: /opt/matlab
+        read_only: true
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${CAS_DOCKER_PORT:-8769}/health')"]
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${CAS_DOCKER_PORT:-8769}/health')"]
       interval: 30s
       timeout: 5s
       retries: 3

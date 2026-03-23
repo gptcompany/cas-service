@@ -19,10 +19,15 @@ def _compose_config() -> dict:
     return json.loads(result.stdout)
 
 
-def test_docker_compose_uses_docker_specific_port_when_project_env_has_host_override():
+def test_docker_compose_uses_docker_specific_runtime_settings_when_project_env_has_host_overrides():
     config = _compose_config()
     svc = config["services"]["cas-service"]
-    assert svc["environment"]["CAS_PORT"] == "8769"
+    env = svc["environment"]
+
+    assert env["CAS_PORT"] == "8769"
+    assert env["CAS_DEFAULT_ENGINE"] == "sage"
+    assert env["CAS_SAGE_PATH"] == "/usr/bin/sage"
+    assert env["CAS_MATLAB_PATH"] == "/opt/matlab/bin/matlab"
     assert svc["ports"][0]["published"] == "8769"
     assert svc["ports"][0]["target"] == 8769
 
@@ -30,4 +35,14 @@ def test_docker_compose_uses_docker_specific_port_when_project_env_has_host_over
 def test_healthcheck_targets_docker_specific_default_port():
     config = _compose_config()
     cmd = " ".join(config["services"]["cas-service"]["healthcheck"]["test"])
+    assert cmd.startswith("CMD /app/.venv/bin/python -c")
     assert "localhost:8769/health" in cmd
+
+
+def test_docker_compose_mounts_host_matlab_installation_into_container():
+    config = _compose_config()
+    volume = config["services"]["cas-service"]["volumes"][0]
+    assert volume["type"] == "bind"
+    assert volume["source"] == "/media/sam/3TB-WDC/matlab2025"
+    assert volume["target"] == "/opt/matlab"
+    assert volume["read_only"] is True

@@ -190,10 +190,16 @@ dotenvx run -f .env -- docker compose up -d
 curl -s localhost:8769/health | jq .
 ```
 
-For Docker, the compose stack uses `CAS_DOCKER_PORT` (default `8769`) so it
-does not inherit a host-side `CAS_PORT` override from the project `.env`. This
-lets the container path stay stable even when the host/systemd path uses a
-different local port setting.
+For Docker, the compose stack uses Docker-specific variables so it does not
+inherit host-side overrides from the project `.env`:
+- `CAS_DOCKER_PORT` defaults to `8769`
+- `CAS_DOCKER_SAGE_PATH` defaults to `/usr/bin/sage`
+- `CAS_DOCKER_MATLAB_PATH` defaults to `/opt/matlab/bin/matlab`
+- `CAS_DOCKER_MATLAB_HOST_PATH` defaults to `/media/sam/3TB-WDC/matlab2025` and is
+  bind-mounted into the container at `/opt/matlab`
+
+This keeps the container runtime stable even when the host/systemd path uses
+different local settings such as `CAS_PORT`, `CAS_SAGE_PATH`, or `CAS_MATLAB_PATH`.
 
 Or with an explicit shell fallback:
 
