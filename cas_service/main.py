@@ -175,6 +175,9 @@ class CASHandler(BaseHTTPRequestHandler):
             {
                 "status": "ok",
                 "service": "cas-service",
+                "version": os.environ.get("CAS_VERSION", "1.0.2"),
+                "commit_sha": os.environ.get("CAS_COMMIT_SHA", "unknown"),
+                "build_at": os.environ.get("CAS_BUILD_AT", "unknown"),
                 "uptime_seconds": round(time.time() - _start_time, 1),
                 "engines_total": len(ENGINES),
                 "engines_available": available_count,

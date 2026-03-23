@@ -1,6 +1,11 @@
 services:
   cas-service:
-    build: .
+    build:
+      context: .
+      args:
+        VERSION: ${CAS_VERSION:-unknown}
+        COMMIT_SHA: ${CAS_COMMIT_SHA:-unknown}
+        BUILD_AT: ${CAS_BUILD_AT:-unknown}
     ports:
       - "${CAS_DOCKER_PORT:-8769}:${CAS_DOCKER_PORT:-8769}"
     environment:
