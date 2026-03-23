@@ -22,7 +22,7 @@ permissions:
 jobs:
   notify:
     if: github.repository_owner == 'gptcompany'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, muletto]
     steps:
       - name: Repository dispatch to pepers
         id: pepers_dispatch

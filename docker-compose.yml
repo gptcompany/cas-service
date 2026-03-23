@@ -2,9 +2,9 @@ services:
   cas-service:
     build: .
     ports:
-      - "${CAS_PORT:-8769}:${CAS_PORT:-8769}"
+      - "${CAS_DOCKER_PORT:-8769}:${CAS_DOCKER_PORT:-8769}"
     environment:
-      - CAS_PORT=${CAS_PORT:-8769}
+      - CAS_PORT=${CAS_DOCKER_PORT:-8769}
       - CAS_DEFAULT_ENGINE
       - CAS_SYMPY_TIMEOUT
       - CAS_SAGE_PATH
@@ -18,7 +18,7 @@ services:
     # volumes:
     #   - /usr/local/MATLAB:/opt/matlab:ro
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${CAS_PORT:-8769}/health')"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${CAS_DOCKER_PORT:-8769}/health')"]
       interval: 30s
       timeout: 5s
       retries: 3

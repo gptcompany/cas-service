@@ -190,10 +190,15 @@ dotenvx run -f .env -- docker compose up -d
 curl -s localhost:8769/health | jq .
 ```
 
+For Docker, the compose stack uses `CAS_DOCKER_PORT` (default `8769`) so it
+does not inherit a host-side `CAS_PORT` override from the project `.env`. This
+lets the container path stay stable even when the host/systemd path uses a
+different local port setting.
+
 Or with an explicit shell fallback:
 
 ```bash
-curl -s "localhost:${CAS_PORT:-8769}/health" | jq .
+curl -s "localhost:${CAS_DOCKER_PORT:-8769}/health" | jq .
 ```
 
 The `.env` file is encrypted with dotenvx. `dotenvx run` decrypts it and passes the environment variables to the container. If you don't use dotenvx, pass variables manually:

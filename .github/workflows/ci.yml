@@ -25,13 +25,8 @@ concurrency:
 
 jobs:
   test:
-    name: "${{ matrix.os }} / py${{ matrix.python-version }}"
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ["3.11"]
+    name: self-hosted / py3.11
+    runs-on: [self-hosted, Linux, X64, muletto]
 
     steps:
       - name: Checkout
@@ -40,7 +35,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -54,15 +49,12 @@ jobs:
         run: uv run python -m cas_service.setup.main --help
 
       - name: Setup wizard tests
-        if: runner.os == 'Linux'
         run: uv run pytest -q tests/test_setup_wizard.py
 
-      - name: Full test suite (Linux only)
-        if: runner.os == 'Linux'
+      - name: Full test suite
         run: uv run pytest --cov=cas_service --cov-report=term --cov-report=json
 
       - name: Extract coverage percentage
-        if: runner.os == 'Linux'
         id: cov
         run: |
           COV=$(python -c "import json; print(int(json.load(open('coverage.json'))['totals']['percent_covered']))")
@@ -70,7 +62,7 @@ jobs:
 
       - name: Update coverage badge
         id: badge
-        if: runner.os == 'Linux' && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.cov.outputs.pct
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.cov.outputs.pct
         continue-on-error: true
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:
@@ -84,6 +76,6 @@ jobs:
           maxColorRange: 90
 
       - name: Warn if coverage badge update failed
-        if: always() && runner.os == 'Linux' && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.cov.outputs.pct && steps.badge.outcome == 'failure'
+        if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.cov.outputs.pct && steps.badge.outcome == 'failure'
         run: |
           echo "::warning::Coverage badge update failed. Check GIST_TOKEN validity/scope and gist access for ac39e6516b7114f96b84ba445b8e7a83."

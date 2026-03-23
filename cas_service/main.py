@@ -532,7 +532,9 @@ def main() -> None:
 
         def sigterm_handler(signum: int, frame: Any) -> None:
             logger.info("SIGTERM received, shutting down...")
-            server.shutdown()
+            # HTTPServer.shutdown() must run from another thread; calling it
+            # directly from the signal handler can deadlock the main thread.
+            threading.Thread(target=server.shutdown, daemon=True).start()
 
         signal.signal(signal.SIGTERM, sigterm_handler)
 
