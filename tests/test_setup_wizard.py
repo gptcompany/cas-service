@@ -462,9 +462,12 @@ class TestServiceStep:
         step = self._make()
         assert step.check() is True
 
+    @patch(
+        "cas_service.setup._service.ServiceStep._is_docker_running", return_value=False
+    )
     @patch("cas_service.setup._service.os.path.isfile", return_value=False)
-    def test_check_no_unit_file(self, mock_isfile):
-        """check() returns False when unit file does not exist."""
+    def test_check_no_unit_file(self, mock_isfile, _mock_docker):
+        """check() returns False when unit file does not exist and Docker is not running."""
         step = self._make()
         assert step.check() is False
 
@@ -593,43 +596,6 @@ class TestServiceStep:
 # ===========================================================================
 
 
-class TestEnableMatlabVolume:
-    """Tests for _enable_matlab_volume helper."""
-
-    def _call(self, compose_text, matlab_root):
-        from cas_service.setup._service import _enable_matlab_volume
-
-        return _enable_matlab_volume(compose_text, matlab_root)
-
-    def test_uncomments_existing_volume(self):
-        """Uncomments the commented-out MATLAB volume section."""
-        compose = (
-            "services:\n"
-            "  cas-service:\n"
-            "    restart: unless-stopped\n"
-            "    # Per MATLAB: decommentare e impostare il path host\n"
-            "    # volumes:\n"
-            "    #   - /usr/local/MATLAB:/opt/matlab:ro\n"
-        )
-        result = self._call(compose, "/media/sam/3TB-WDC/matlab2025")
-        assert "volumes:" in result
-        assert "/media/sam/3TB-WDC/matlab2025:/opt/matlab:ro" in result
-        assert "#" not in result.split("volumes:")[1].split("\n")[0]
-
-    def test_inserts_after_restart_if_no_volumes(self):
-        """Adds volumes section after restart line if none exists."""
-        compose = "services:\n  cas-service:\n    restart: unless-stopped\n"
-        result = self._call(compose, "/opt/MATLAB/R2025b")
-        assert "volumes:" in result
-        assert "/opt/MATLAB/R2025b:/opt/matlab:ro" in result
-
-    def test_returns_unchanged_if_no_anchor(self):
-        """Returns text unchanged if no restart line found."""
-        compose = "services:\n  cas-service:\n    build: .\n"
-        result = self._call(compose, "/opt/MATLAB")
-        assert result == compose
-
-
 class TestMaybeEnableMatlabVolume:
     """Tests for ServiceStep._maybe_enable_matlab_volume."""
 
@@ -639,32 +605,89 @@ class TestMaybeEnableMatlabVolume:
         from cas_service.setup._service import ServiceStep
 
         ServiceStep._maybe_enable_matlab_volume(_console())
-        # No error, no crash
 
     @patch("cas_service.setup._service.questionary")
-    @patch("cas_service.setup._service.Path")
+    @patch("cas_service.setup._service.write_key")
     @patch("cas_service.setup._service.os.path.isdir", return_value=True)
     @patch("cas_service.setup._service.os.path.isfile", return_value=True)
     @patch("cas_service.setup._service.os.path.isabs", return_value=True)
-    @patch(
-        "cas_service.setup._service.get_key",
-        return_value="/media/sam/3TB-WDC/matlab2025/bin/matlab",
-    )
+    @patch("cas_service.setup._service.get_key")
     def test_skips_when_user_declines(
-        self, mock_key, mock_isabs, mock_isfile, mock_isdir, mock_path, mock_q
+        self, mock_get_key, mock_isabs, mock_isfile, mock_isdir, mock_write_key, mock_q
     ):
-        """Skips volume mount when user declines."""
+        """Skips Docker MATLAB env wiring when user declines."""
         mock_q.confirm.return_value.ask.return_value = False
-        mock_path_inst = MagicMock()
-        mock_path_inst.resolve.return_value.parent.parent = Path(
-            "/media/sam/3TB-WDC/matlab2025"
-        )
-        mock_path.return_value = mock_path_inst
+        values = {
+            "CAS_MATLAB_PATH": "/media/sam/3TB-WDC/matlab2025/bin/matlab",
+            "CAS_DOCKER_MATLAB_HOST_PATH": None,
+            "CAS_DOCKER_MATLAB_PATH": None,
+        }
+        mock_get_key.side_effect = values.get
 
         from cas_service.setup._service import ServiceStep
 
-        ServiceStep._maybe_enable_matlab_volume(_console())
-        # No file written
+        with patch("cas_service.setup._service.Path.resolve") as mock_resolve:
+            mock_resolve.return_value = Path("/media/sam/3TB-WDC/matlab2025/bin/matlab")
+            ServiceStep._maybe_enable_matlab_volume(_console())
+
+        mock_write_key.assert_not_called()
+
+    @patch("cas_service.setup._service.questionary")
+    @patch("cas_service.setup._service.write_key")
+    @patch("cas_service.setup._service.os.path.isdir", return_value=True)
+    @patch("cas_service.setup._service.os.path.isfile", return_value=True)
+    @patch("cas_service.setup._service.os.path.isabs", return_value=True)
+    @patch("cas_service.setup._service.get_key")
+    def test_writes_docker_specific_matlab_env_keys(
+        self, mock_get_key, mock_isabs, mock_isfile, mock_isdir, mock_write_key, mock_q
+    ):
+        """Writes Docker-specific MATLAB keys instead of editing compose."""
+        mock_q.confirm.return_value.ask.return_value = True
+        values = {
+            "CAS_MATLAB_PATH": "/media/sam/3TB-WDC/matlab2025/bin/matlab",
+            "CAS_DOCKER_MATLAB_HOST_PATH": None,
+            "CAS_DOCKER_MATLAB_PATH": None,
+        }
+        mock_get_key.side_effect = values.get
+
+        from cas_service.setup._service import ServiceStep
+
+        with patch("cas_service.setup._service.Path.resolve") as mock_resolve:
+            mock_resolve.return_value = Path("/media/sam/3TB-WDC/matlab2025/bin/matlab")
+            ServiceStep._maybe_enable_matlab_volume(_console())
+
+        mock_write_key.assert_any_call(
+            "CAS_DOCKER_MATLAB_HOST_PATH", "/media/sam/3TB-WDC/matlab2025"
+        )
+        mock_write_key.assert_any_call(
+            "CAS_DOCKER_MATLAB_PATH", "/opt/matlab/bin/matlab"
+        )
+
+    @patch("cas_service.setup._service.questionary")
+    @patch("cas_service.setup._service.write_key")
+    @patch("cas_service.setup._service.os.path.isdir", return_value=True)
+    @patch("cas_service.setup._service.os.path.isfile", return_value=True)
+    @patch("cas_service.setup._service.os.path.isabs", return_value=True)
+    @patch("cas_service.setup._service.get_key")
+    def test_noop_when_docker_matlab_mount_already_configured(
+        self, mock_get_key, mock_isabs, mock_isfile, mock_isdir, mock_write_key, mock_q
+    ):
+        """Does not prompt or rewrite when Docker MATLAB env is already aligned."""
+        values = {
+            "CAS_MATLAB_PATH": "/media/sam/3TB-WDC/matlab2025/bin/matlab",
+            "CAS_DOCKER_MATLAB_HOST_PATH": "/media/sam/3TB-WDC/matlab2025",
+            "CAS_DOCKER_MATLAB_PATH": "/opt/matlab/bin/matlab",
+        }
+        mock_get_key.side_effect = values.get
+
+        from cas_service.setup._service import ServiceStep
+
+        with patch("cas_service.setup._service.Path.resolve") as mock_resolve:
+            mock_resolve.return_value = Path("/media/sam/3TB-WDC/matlab2025/bin/matlab")
+            ServiceStep._maybe_enable_matlab_volume(_console())
+
+        mock_q.confirm.assert_not_called()
+        mock_write_key.assert_not_called()
 
 
 # ===========================================================================

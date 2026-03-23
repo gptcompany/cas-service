@@ -5,7 +5,6 @@ from __future__ import annotations
 import getpass
 import json
 import os
-import re
 import shutil
 import socket
 import subprocess
@@ -19,7 +18,15 @@ from rich.console import Console
 
 from pathlib import Path
 
-from cas_service.setup._config import DEFAULT_CAS_PORT, get_cas_port, get_key, set_cas_port
+from cas_service.setup._config import (
+    DEFAULT_CAS_PORT,
+    get_cas_port,
+    get_docker_port,
+    get_key,
+    set_cas_port,
+    set_docker_port,
+    write_key,
+)
 
 PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 UNIT_FILE_SRC = os.path.join(PROJECT_ROOT, "cas-service.service")
@@ -48,37 +55,6 @@ def _render_systemd_unit(template: str) -> str:
     return rendered
 
 
-def _enable_matlab_volume(compose_text: str, matlab_root: str) -> str:
-    """Enable MATLAB volume mount in docker-compose.yml content.
-
-    Handles two cases:
-    1. Commented-out volumes section → uncomment and set path
-    2. No volumes section → insert after healthcheck block
-    """
-    volume_line = f"      - {matlab_root}:{_DOCKER_MATLAB_MOUNT}:ro"
-
-    # Case 1: uncomment existing commented volumes
-    pattern = re.compile(
-        r"^(\s*)#\s*volumes:\s*\n\s*#\s*-\s*[^\n]*matlab[^\n]*$",
-        re.MULTILINE | re.IGNORECASE,
-    )
-    match = pattern.search(compose_text)
-    if match:
-        indent = match.group(1) or "    "
-        replacement = f"{indent}volumes:\n{volume_line}"
-        return compose_text[: match.start()] + replacement + compose_text[match.end() :]
-
-    # Case 2: insert volumes after restart line
-    restart_match = re.search(r"^(\s*)restart:.*$", compose_text, re.MULTILINE)
-    if restart_match:
-        indent = restart_match.group(1) or "    "
-        insert = f"\n{indent}volumes:\n{volume_line}"
-        pos = restart_match.end()
-        return compose_text[:pos] + insert + compose_text[pos:]
-
-    return compose_text
-
-
 class ServiceStep:
     """Configure CAS service deployment: systemd, Docker Compose, or foreground."""
 
@@ -92,7 +68,7 @@ class ServiceStep:
         """Return True if a deployment is already configured."""
         # Deployment is considered configured only if it is also reachable on
         # the currently configured CAS_PORT.
-        if self._is_docker_running() and self._health_ok():
+        if self._is_docker_running() and self._health_ok(docker=True):
             return True
         # Then systemd
         if not os.path.isfile(UNIT_FILE_DST):
@@ -184,10 +160,12 @@ class ServiceStep:
             return False
 
         if port_choice == default_choice:
-            if not set_cas_port(DEFAULT_CAS_PORT):
-                console.print("  [red]Failed to set default CAS_PORT.[/]")
+            if not set_cas_port(DEFAULT_CAS_PORT) or not set_docker_port(DEFAULT_CAS_PORT):
+                console.print("  [red]Failed to set default CAS ports.[/]")
                 return False
-            console.print(f"  [green]CAS_PORT set to default {DEFAULT_CAS_PORT}[/]")
+            console.print(
+                f"  [green]CAS_PORT and CAS_DOCKER_PORT set to default {DEFAULT_CAS_PORT}[/]"
+            )
             return True
 
         custom_raw = questionary.text(
@@ -218,10 +196,12 @@ class ServiceStep:
                 return False
         else:
             console.print(f"  [green]Port {custom_port} is free.[/]")
-        if not set_cas_port(custom_port):
+        if not set_cas_port(custom_port) or not set_docker_port(custom_port):
             console.print("  [red]Invalid port. Must be between 1 and 65535.[/]")
             return False
-        console.print(f"  [green]CAS_PORT set to {custom_port}[/]")
+        console.print(
+            f"  [green]CAS_PORT and CAS_DOCKER_PORT set to {custom_port}[/]"
+        )
         return True
 
     def verify(self) -> bool:
@@ -229,7 +209,7 @@ class ServiceStep:
         if self._mode and self._mode.startswith("systemd"):
             return self._health_ok()
         if self._mode and self._mode.startswith("docker"):
-            return self._is_docker_running() and self._health_ok()
+            return self._is_docker_running() and self._health_ok(docker=True)
         # Foreground mode always "verifies" — user just runs the command
         return True
 
@@ -369,7 +349,9 @@ class ServiceStep:
             cmd = ["docker", "compose", "up", "-d"]
 
         run_env = os.environ.copy()
-        run_env["CAS_PORT"] = str(get_cas_port())
+        docker_port = str(get_docker_port())
+        run_env["CAS_PORT"] = docker_port
+        run_env["CAS_DOCKER_PORT"] = docker_port
 
         try:
             subprocess.run(
@@ -381,9 +363,9 @@ class ServiceStep:
                 timeout=60,
             )
             console.print("  [green]Docker container started.[/]")
-            if not self._wait_health(timeout_s=45):
+            if not self._wait_health(timeout_s=45, docker=True):
                 console.print(
-                    f"  [red]CAS /health is not reachable on configured port {get_cas_port()} after startup.[/]"
+                    f"  [red]CAS /health is not reachable on configured Docker port {get_docker_port()} after startup.[/]"
                 )
                 try:
                     logs = subprocess.run(
@@ -415,8 +397,8 @@ class ServiceStep:
             return False
 
     @staticmethod
-    def _health_ok() -> bool:
-        port = get_cas_port()
+    def _health_ok(*, docker: bool = False) -> bool:
+        port = get_docker_port() if docker else get_cas_port()
         url = f"http://localhost:{port}/health"
         try:
             req = urllib.request.Request(url, headers={"Accept": "application/json"})
@@ -426,10 +408,10 @@ class ServiceStep:
         except (urllib.error.URLError, OSError, json.JSONDecodeError, Exception):
             return False
 
-    def _wait_health(self, timeout_s: int = 45) -> bool:
+    def _wait_health(self, timeout_s: int = 45, *, docker: bool = False) -> bool:
         start = time.time()
         while time.time() - start < timeout_s:
-            if self._health_ok():
+            if self._health_ok(docker=docker):
                 return True
             time.sleep(2)
         return False
@@ -469,7 +451,6 @@ class ServiceStep:
         if not matlab_path:
             return
 
-        # Resolve the MATLAB root (e.g. /media/sam/3TB-WDC/matlab2025 from .../bin/matlab)
         resolved = (
             shutil.which(matlab_path) if not os.path.isabs(matlab_path) else matlab_path
         )
@@ -480,8 +461,18 @@ class ServiceStep:
         if not os.path.isdir(matlab_root):
             return
 
+        container_matlab_bin = f"{_DOCKER_MATLAB_MOUNT}/bin/matlab"
+        if (
+            get_key("CAS_DOCKER_MATLAB_HOST_PATH") == matlab_root
+            and get_key("CAS_DOCKER_MATLAB_PATH") == container_matlab_bin
+        ):
+            console.print("  [dim]MATLAB Docker mount already configured in .env.[/]")
+            return
+
         console.print(f"  [cyan]MATLAB detected on host:[/] {matlab_root}")
-        console.print("  Docker containers cannot access host paths directly.")
+        console.print(
+            "  Docker uses .env-driven bind mounts; docker-compose.yml does not need manual edits."
+        )
         enable = questionary.confirm(
             f"  Mount {matlab_root} into container at {_DOCKER_MATLAB_MOUNT}?",
             default=True,
@@ -492,34 +483,13 @@ class ServiceStep:
             )
             return
 
-        # Enable volume mount in docker-compose.yml
-        compose_text = Path(COMPOSE_FILE).read_text()
-        container_matlab_bin = f"{_DOCKER_MATLAB_MOUNT}/bin/matlab"
-
-        if f"{matlab_root}:{_DOCKER_MATLAB_MOUNT}" in compose_text:
-            console.print("  [dim]MATLAB volume already configured.[/]")
-        else:
-            # Replace commented volume section or add new one
-            updated = _enable_matlab_volume(compose_text, matlab_root)
-            if updated != compose_text:
-                Path(COMPOSE_FILE).write_text(updated)
-                console.print(
-                    f"  [green]Enabled volume:[/] {matlab_root} -> {_DOCKER_MATLAB_MOUNT}"
-                )
-            else:
-                console.print("  [yellow]Could not auto-edit docker-compose.yml.[/]")
-                console.print(
-                    f"  Add manually under services.cas-service:\n"
-                    f"    volumes:\n"
-                    f"      - {matlab_root}:{_DOCKER_MATLAB_MOUNT}:ro"
-                )
-
-        # Update CAS_MATLAB_PATH to container-side path
-        from cas_service.setup._config import write_key
-
-        write_key("CAS_MATLAB_PATH", container_matlab_bin)
+        write_key("CAS_DOCKER_MATLAB_HOST_PATH", matlab_root)
+        write_key("CAS_DOCKER_MATLAB_PATH", container_matlab_bin)
         console.print(
-            f"  [green]Set CAS_MATLAB_PATH={container_matlab_bin}[/] (container path)"
+            f"  [green]Set CAS_DOCKER_MATLAB_HOST_PATH={matlab_root}[/]"
+        )
+        console.print(
+            f"  [green]Set CAS_DOCKER_MATLAB_PATH={container_matlab_bin}[/]"
         )
 
     # ------------------------------------------------------------------

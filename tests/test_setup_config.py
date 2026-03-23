@@ -68,6 +68,27 @@ class TestSetupConfig:
         temp_env_file.write_text(f"CAS_PORT={raw_value}\n")
         assert setup_config.get_cas_port(default=8765) == 8765
 
+    def test_get_docker_port_uses_configured_value(self, temp_env_file):
+        temp_env_file.write_text("CAS_DOCKER_PORT=9020\n")
+        assert setup_config.get_docker_port() == 9020
+
+    def test_get_docker_port_falls_back_to_cas_port(self, temp_env_file):
+        temp_env_file.write_text("CAS_PORT=9015\n")
+        assert setup_config.get_docker_port() == 9015
+
+    @pytest.mark.parametrize("raw_value", ["abc", "0", "65536", "-1"])
+    def test_get_docker_port_invalid_values_fallback(self, temp_env_file, raw_value):
+        temp_env_file.write_text(f"CAS_DOCKER_PORT={raw_value}\n")
+        assert setup_config.get_docker_port(default=8766) == 8766
+
+    def test_set_docker_port_persists_valid_value(self, temp_env_file):
+        assert setup_config.set_docker_port(9042) is True
+        assert temp_env_file.read_text().splitlines() == ["CAS_DOCKER_PORT=9042"]
+
+    def test_set_docker_port_rejects_invalid_value(self, temp_env_file):
+        assert setup_config.set_docker_port(0) is False
+        assert temp_env_file.exists() is False
+
     def test_get_service_url_uses_host_and_configured_port(self, temp_env_file):
         temp_env_file.write_text("CAS_PORT=9123\n")
         assert setup_config.get_service_url() == "http://localhost:9123"

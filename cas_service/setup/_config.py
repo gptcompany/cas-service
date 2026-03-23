@@ -9,6 +9,7 @@ from pathlib import Path
 # Project root .env (next to pyproject.toml)
 _ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
 DEFAULT_CAS_PORT = 8769
+DEFAULT_CAS_DOCKER_PORT = DEFAULT_CAS_PORT
 DEFAULT_CAS_HOST = "localhost"
 
 
@@ -60,11 +61,29 @@ def get_key(key: str) -> str | None:
     return os.environ.get(key) or None
 
 
-def get_cas_port(default: int = DEFAULT_CAS_PORT) -> int:
-    """Resolve CAS_PORT from config/env, with validation and fallback."""
-    raw = get_key("CAS_PORT")
+def _resolve_port(key: str, default: int) -> int:
+    raw = get_key(key)
     if raw is None:
         return default
+    try:
+        port = int(raw)
+    except ValueError:
+        return default
+    if not (1 <= port <= 65535):
+        return default
+    return port
+
+
+def get_cas_port(default: int = DEFAULT_CAS_PORT) -> int:
+    """Resolve CAS_PORT from config/env, with validation and fallback."""
+    return _resolve_port("CAS_PORT", default)
+
+
+def get_docker_port(default: int = DEFAULT_CAS_DOCKER_PORT) -> int:
+    """Resolve CAS_DOCKER_PORT, falling back to CAS_PORT when unset."""
+    raw = get_key("CAS_DOCKER_PORT")
+    if raw is None:
+        return get_cas_port(default)
     try:
         port = int(raw)
     except ValueError:
@@ -90,6 +109,14 @@ def set_cas_port(port: int) -> bool:
     if not (1 <= port <= 65535):
         return False
     write_key("CAS_PORT", str(port))
+    return True
+
+
+def set_docker_port(port: int) -> bool:
+    """Persist CAS_DOCKER_PORT in .env after validation."""
+    if not (1 <= port <= 65535):
+        return False
+    write_key("CAS_DOCKER_PORT", str(port))
     return True
 
 

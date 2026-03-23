@@ -198,8 +198,10 @@ inherit host-side overrides from the project `.env`:
 - `CAS_DOCKER_MATLAB_HOST_PATH` defaults to `/media/sam/3TB-WDC/matlab2025` and is
   bind-mounted into the container at `/opt/matlab`
 
-This keeps the container runtime stable even when the host/systemd path uses
-different local settings such as `CAS_PORT`, `CAS_SAGE_PATH`, or `CAS_MATLAB_PATH`.
+`cas-setup service` now writes both `CAS_PORT` and `CAS_DOCKER_PORT` together, so
+the wizard-driven Docker path and health checks stay aligned on the same port.
+MATLAB Docker mounts are configured by writing `CAS_DOCKER_MATLAB_HOST_PATH` in
+`.env`; the compose file itself is no longer edited by the wizard.
 
 Or with an explicit shell fallback:
 
@@ -213,12 +215,9 @@ The `.env` file is encrypted with dotenvx. `dotenvx run` decrypts it and passes 
 CAS_WOLFRAMALPHA_APPID=your-key docker compose up -d
 ```
 
-To mount a MATLAB installation, uncomment the volumes section in `docker-compose.yml`:
-
-```yaml
-volumes:
-  - /usr/local/MATLAB:/opt/matlab:ro
-```
+To mount a MATLAB installation, set `CAS_DOCKER_MATLAB_HOST_PATH` in `.env`
+or run `cas-setup service`, which will detect the host MATLAB install and write
+the Docker-specific path for you.
 
 Stop: `docker compose down`
 
