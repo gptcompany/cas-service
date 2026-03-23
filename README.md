@@ -243,3 +243,6 @@ Engine paths and API keys are stored in the project `.env` file. Use the wizard 
 cas-setup configure     # Re-configure engine paths and API keys (linear subcommand)
 cas-setup verify        # Verify running service + smoke test all engines (linear subcommand)
 ```
+
+## Monitoring
+Service health and version tracking available at `/health`. See [Monitoring Standard](https://github.com/gptcompany/progressive-deploy/blob/master/docs/MONITORING_STANDARD.md).
