@@ -2,5 +2,15 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "Disabilita antlr4-python3-runtime 4.13.2 per incompatibilita con sympy.parsing.latex (richiede antlr4 4.11.x) (#12)",
+      "matchPackageNames": [
+        "antlr4-python3-runtime"
+      ],
+      "matchNewValue": "*4.13.2*",
+      "enabled": false
+    }
   ]
 }
