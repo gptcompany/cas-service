@@ -5,7 +5,7 @@ description = "Multi-engine CAS microservice — Sage, SymPy, MATLAB, WolframAlp
 requires-python = ">=3.11"
 dependencies = [
     "sympy>=1.13",
-    "antlr4-python3-runtime==4.11.1",
+    "antlr4-python3-runtime==4.13.2",
     "questionary>=2.0",
     "rich>=13.0",
 ]
