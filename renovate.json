@@ -5,12 +5,11 @@
   ],
   "packageRules": [
     {
-      "description": "Disabilita antlr4-python3-runtime 4.13.2 per incompatibilita con sympy.parsing.latex (richiede antlr4 4.11.x) (#12)",
+      "description": "Limita antlr4-python3-runtime alla serie 4.11.x richiesta da sympy.parsing.latex (#12)",
       "matchPackageNames": [
         "antlr4-python3-runtime"
       ],
-      "matchNewValue": "*4.13.2*",
-      "enabled": false
+      "allowedVersions": "/^4\\.11\\./"
     }
   ]
 }
