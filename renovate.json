@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "github>gptcompany/gbg-agents//renovate/weekly"
   ],
   "packageRules": [
     {
