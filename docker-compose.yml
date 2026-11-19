@@ -7,7 +7,7 @@ services:
         COMMIT_SHA: ${CAS_COMMIT_SHA:-unknown}
         BUILD_AT: ${CAS_BUILD_AT:-unknown}
     ports:
-      - "${CAS_DOCKER_PORT:-8769}:${CAS_DOCKER_PORT:-8769}"
+      - "127.0.0.1:${CAS_DOCKER_PORT:-8769}:${CAS_DOCKER_PORT:-8769}"
     environment:
       - CAS_PORT=${CAS_DOCKER_PORT:-8769}
       - CAS_DEFAULT_ENGINE=${CAS_DOCKER_DEFAULT_ENGINE:-sage}
@@ -30,4 +30,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    # LIMITE di isolamento (decisione limiti-risorse-calcolo-agenti), non un
+    # parametro scelto: provvisorio finche' non c'e' l'RSS di picco misurato
+    # nella prova (fase 2 di F-775); poi si versiona il picco misurato. Niente swap.
+    mem_limit: 4g
+    memswap_limit: 4g
     restart: unless-stopped
