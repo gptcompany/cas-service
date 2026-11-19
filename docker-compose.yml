@@ -6,9 +6,10 @@ services:
         VERSION: ${CAS_VERSION:-unknown}
         COMMIT_SHA: ${CAS_COMMIT_SHA:-unknown}
         BUILD_AT: ${CAS_BUILD_AT:-unknown}
-    ports:
-      - "127.0.0.1:${CAS_DOCKER_PORT:-8769}:${CAS_DOCKER_PORT:-8769}"
+    # Rete dell'host (decisione dell'operatore): niente ports; ascolta solo su 127.0.0.1.
+    network_mode: host
     environment:
+      - CAS_HOST=127.0.0.1
       - CAS_PORT=${CAS_DOCKER_PORT:-8769}
       - CAS_DEFAULT_ENGINE=${CAS_DOCKER_DEFAULT_ENGINE:-sage}
       - CAS_SYMPY_TIMEOUT

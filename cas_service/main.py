@@ -8,6 +8,7 @@ Usage:
 
 Environment:
     CAS_PORT=8769              # HTTP listen port
+    CAS_HOST=0.0.0.0           # HTTP listen address (compose: 127.0.0.1)
     CAS_SYMPY_TIMEOUT=5        # SymPy parse/simplify timeout (seconds)
     CAS_MATLAB_PATH=matlab     # MATLAB binary (searches PATH)
     CAS_MATLAB_TIMEOUT=30      # MATLAB subprocess timeout (seconds)
@@ -529,7 +530,8 @@ def main() -> None:
     port = int(os.environ.get("CAS_PORT", str(DEFAULT_CAS_PORT)))
     _start_time = time.time()
 
-    server = HTTPServer(("0.0.0.0", port), CASHandler)
+    host = os.environ.get("CAS_HOST", "").strip() or "0.0.0.0"
+    server = HTTPServer((host, port), CASHandler)
 
     if threading.current_thread() is threading.main_thread():
 
@@ -541,7 +543,7 @@ def main() -> None:
 
         signal.signal(signal.SIGTERM, sigterm_handler)
 
-    logger.info("CAS service starting on port %d", port)
+    logger.info("CAS service starting on %s:%d", host, port)
 
     try:
         server.serve_forever()
