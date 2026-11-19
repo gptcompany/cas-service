@@ -28,9 +28,9 @@ services:
         target: /opt/matlab
         read_only: true
     # Stesso indirizzo IPv4 e stessa porta con cui CAS si lega (CAS_HOST/CAS_PORT dell'ambiente del container): in
-    # rete host `localhost` puo' risolversi in ::1 e un altro servizio li' certificherebbe CAS.
+    # rete host `localhost` puo' risolversi in ::1 e un altro servizio li' certificherebbe CAS. Senza proxy ambientali.
     healthcheck:
-      test: ["CMD", "/app/.venv/bin/python", "-c", "import os, urllib.request as u; u.urlopen('http://%s:%s/health' % (os.environ['CAS_HOST'], os.environ['CAS_PORT']))"]
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import os, urllib.request as u; u.build_opener(u.ProxyHandler({})).open('http://%s:%s/health' % (os.environ['CAS_HOST'], os.environ['CAS_PORT']), timeout=5)"]
       interval: 30s
       timeout: 5s
       retries: 3

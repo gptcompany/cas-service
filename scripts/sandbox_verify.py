@@ -93,10 +93,14 @@ def wait_ready(
     timeout_s: float = DEFAULT_TIMEOUT_S,
 ) -> str:
     start = now()
+
+    def left() -> float:
+        return max(timeout_s - (now() - start), 0.001)
+
     while True:
         # Ogni comando esterno ha per tetto il tempo che resta all'attesa: scaduto, il controllo fallisce chiuso.
-        left = max(timeout_s - (now() - start), 0.001)
-        state = listener_state(parse_ss(list_listeners(left)), container_inodes(left), port)
+        listeners = parse_ss(list_listeners(left()))
+        state = listener_state(listeners, container_inodes(left()), port)
         if state == "owned":
             if health():
                 log(f"ready: listener del container su {LOOPBACK}:{port} e /health ok")
