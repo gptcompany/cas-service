@@ -9,7 +9,7 @@ on:
         type: string
         default: '["self-hosted","linux","ws"]'
       rebuild_image:
-        description: Rebuild Docker image before validation
+        description: Ignored, the image is always rebuilt (host networking needs the current CAS_HOST support)
         required: true
         type: boolean
         default: false
@@ -34,35 +34,39 @@ jobs:
           docker --version
           docker compose version
 
+      - name: Resolve CAS port (single source)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Fonte unica: la porta effettiva e' quella risolta da Compose (env, .env o default del file);
+          # listener e salute la leggono da CAS_DOCKER_PORT.
+          port="$(python3 scripts/sandbox_verify.py port)"
+          echo "CAS_DOCKER_PORT=$port" >> "$GITHUB_ENV"
+
+      - name: Require a free port before start
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Prima si costruisce l'immagine: un build fallito non deve lasciare il servizio spento.
+          docker compose build
+          # Si ferma lo stack di questo progetto (se c'e'): ogni altro occupante della porta e' un servizio precedente.
+          docker compose down
+          python3 scripts/sandbox_verify.py preflight --port "$CAS_DOCKER_PORT"
+
       - name: Bring up CAS service
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ inputs.rebuild_image }}" = "true" ]; then
-            docker compose up -d --build
-          else
-            docker compose up -d
-          fi
+          # L'immagine e' gia' stata costruita sopra (sempre ricostruita): in rete host un'immagine vecchia ignorerebbe CAS_HOST e ascolterebbe su 0.0.0.0.
+          docker compose up -d --no-build
 
-      - name: Wait for CAS health endpoint
+      - name: Wait for the compose container to own the loopback listener and serve health
         shell: bash
         run: |
           set -euo pipefail
-          url="http://localhost:${CAS_PORT:-8769}/health"
-          timeout_s=180
-          start="$(date +%s)"
-          while true; do
-            if curl -fsS --max-time 5 "$url" >/tmp/cas-health.json; then
-              echo "OK  $url"
-              cat /tmp/cas-health.json | python -m json.tool || cat /tmp/cas-health.json
-              break
-            fi
-            if [ $(( $(date +%s) - start )) -ge "$timeout_s" ]; then
-              echo "TIMEOUT $url"
-              exit 1
-            fi
-            sleep 3
-          done
+          cid="$(docker compose ps --status running -q cas-service)"
+          test -n "$cid"
+          python3 scripts/sandbox_verify.py wait --port "$CAS_DOCKER_PORT" --container "$cid"
 
       - name: Capture compose diagnostics
         if: always()

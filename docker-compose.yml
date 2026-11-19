@@ -6,9 +6,12 @@ services:
         VERSION: ${CAS_VERSION:-unknown}
         COMMIT_SHA: ${CAS_COMMIT_SHA:-unknown}
         BUILD_AT: ${CAS_BUILD_AT:-unknown}
-    ports:
-      - "${CAS_DOCKER_PORT:-8769}:${CAS_DOCKER_PORT:-8769}"
+    # Rete dell'host (decisione dell'operatore): niente ports; ascolta solo su 127.0.0.1.
+    network_mode: host
+    # Un'immagine precedente ignorerebbe CAS_HOST e ascolterebbe su 0.0.0.0: si ricostruisce sempre.
+    pull_policy: build
     environment:
+      - CAS_HOST=127.0.0.1
       - CAS_PORT=${CAS_DOCKER_PORT:-8769}
       - CAS_DEFAULT_ENGINE=${CAS_DOCKER_DEFAULT_ENGINE:-sage}
       - CAS_SYMPY_TIMEOUT
@@ -24,10 +27,17 @@ services:
         source: ${CAS_DOCKER_MATLAB_HOST_PATH:-/media/sam/3TB-WDC/matlab2025}
         target: /opt/matlab
         read_only: true
+    # Stesso indirizzo IPv4 e stessa porta con cui CAS si lega (CAS_HOST/CAS_PORT dell'ambiente del container): in
+    # rete host `localhost` puo' risolversi in ::1 e un altro servizio li' certificherebbe CAS. Senza proxy ambientali.
     healthcheck:
-      test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${CAS_DOCKER_PORT:-8769}/health')"]
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import os, urllib.request as u; u.build_opener(u.ProxyHandler({})).open('http://%s:%s/health' % (os.environ['CAS_HOST'], os.environ['CAS_PORT']), timeout=5)"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+    # LIMITE di isolamento (decisione limiti-risorse-calcolo-agenti), non un
+    # parametro scelto: provvisorio finche' non c'e' l'RSS di picco misurato
+    # nella prova (fase 2 di F-775); poi si versiona il picco misurato. Niente swap.
+    mem_limit: 4g
+    memswap_limit: 4g
     restart: unless-stopped

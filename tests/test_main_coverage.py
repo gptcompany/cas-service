@@ -261,6 +261,24 @@ def test_main_startup_and_shutdown(mock_server_class):
     assert mock_server_inst.server_close.called
 
 
+@pytest.mark.parametrize(
+    ("host", "expected"),
+    [(None, "0.0.0.0"), ("127.0.0.1", "127.0.0.1"), (" ", "0.0.0.0")],
+)
+@patch("cas_service.main.HTTPServer")
+def test_main_binds_cas_host(mock_server_class, monkeypatch, host, expected):
+    """F-775: l'indirizzo di ascolto e' configurabile (compose in rete host => 127.0.0.1)."""
+    mock_server_class.return_value.serve_forever.side_effect = KeyboardInterrupt()
+    monkeypatch.setenv("CAS_PORT", "8888")
+    if host is None:
+        monkeypatch.delenv("CAS_HOST", raising=False)
+    else:
+        monkeypatch.setenv("CAS_HOST", host)
+    with patch("cas_service.main._init_engines"):
+        cas_main.main()
+    assert mock_server_class.call_args[0][0] == (expected, 8888)
+
+
 def test_handle_engines_with_reason(mock_server):
     class ReasonEngine(BaseEngine):
         name = "reason"
