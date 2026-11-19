@@ -34,6 +34,21 @@ jobs:
           docker --version
           docker compose version
 
+      - name: Resolve CAS port (single source)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Compose, listener e salute leggono tutti CAS_DOCKER_PORT.
+          echo "CAS_DOCKER_PORT=${CAS_DOCKER_PORT:-8769}" >> "$GITHUB_ENV"
+
+      - name: Require a free port before start
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Si ferma lo stack di questo progetto (se c'e'): ogni altro occupante della porta e' un servizio precedente.
+          docker compose down
+          python3 scripts/sandbox_verify.py preflight --port "$CAS_DOCKER_PORT"
+
       - name: Bring up CAS service
         shell: bash
         run: |
@@ -41,38 +56,13 @@ jobs:
           # Sempre --build: in rete host un'immagine vecchia ignorerebbe CAS_HOST e ascolterebbe su 0.0.0.0.
           docker compose up -d --build
 
-      - name: Verify the compose container owns the loopback listener
+      - name: Wait for the compose container to own the loopback listener and serve health
         shell: bash
         run: |
           set -euo pipefail
-          port="${CAS_DOCKER_PORT:-8769}"
-          test -n "$(docker compose ps --status running -q cas-service)"
-          listeners="$(ss -ltn "sport = :$port" | tail -n +2)"
-          echo "$listeners"
-          echo "$listeners" | grep -q "127.0.0.1:$port"
-          if echo "$listeners" | grep -Eq "(0\.0\.0\.0|\*|\[::\]):$port"; then
-            echo "listener non solo su loopback (o servizio precedente ancora attivo)"; exit 1
-          fi
-
-      - name: Wait for CAS health endpoint
-        shell: bash
-        run: |
-          set -euo pipefail
-          url="http://localhost:${CAS_PORT:-8769}/health"
-          timeout_s=180
-          start="$(date +%s)"
-          while true; do
-            if curl -fsS --max-time 5 "$url" >/tmp/cas-health.json; then
-              echo "OK  $url"
-              cat /tmp/cas-health.json | python -m json.tool || cat /tmp/cas-health.json
-              break
-            fi
-            if [ $(( $(date +%s) - start )) -ge "$timeout_s" ]; then
-              echo "TIMEOUT $url"
-              exit 1
-            fi
-            sleep 3
-          done
+          cid="$(docker compose ps --status running -q cas-service)"
+          test -n "$cid"
+          python3 scripts/sandbox_verify.py wait --port "$CAS_DOCKER_PORT" --container "$cid"
 
       - name: Capture compose diagnostics
         if: always()
