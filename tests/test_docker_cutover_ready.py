@@ -79,5 +79,6 @@ def test_docker_compose_caps_memory_without_swap_and_uses_host_network_on_loopba
     assert int(svc["memswap_limit"]) == int(svc["mem_limit"])
     assert svc["restart"] == "unless-stopped"
     assert svc["network_mode"] == "host"
+    assert svc["pull_policy"] == "build"
     assert "ports" not in svc and "extra_hosts" not in svc
     assert svc["environment"]["CAS_HOST"] == "127.0.0.1"

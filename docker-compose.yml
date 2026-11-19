@@ -8,6 +8,8 @@ services:
         BUILD_AT: ${CAS_BUILD_AT:-unknown}
     # Rete dell'host (decisione dell'operatore): niente ports; ascolta solo su 127.0.0.1.
     network_mode: host
+    # Un'immagine precedente ignorerebbe CAS_HOST e ascolterebbe su 0.0.0.0: si ricostruisce sempre.
+    pull_policy: build
     environment:
       - CAS_HOST=127.0.0.1
       - CAS_PORT=${CAS_DOCKER_PORT:-8769}
