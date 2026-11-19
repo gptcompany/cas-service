@@ -1,8 +1,13 @@
 import json
+import socket
 import subprocess
+import sys
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ENV = {
@@ -47,11 +52,72 @@ def test_docker_compose_uses_docker_specific_runtime_settings_when_project_env_h
     assert env["CAS_MATLAB_PATH"] == "/opt/matlab/bin/matlab"
 
 
-def test_healthcheck_targets_docker_specific_default_port():
-    config = _compose_config()
-    cmd = " ".join(config["services"]["cas-service"]["healthcheck"]["test"])
+def test_healthcheck_targets_the_configured_ipv4_host_and_port():
+    """La sonda legge CAS_HOST e CAS_PORT dall'ambiente del container: stesso indirizzo e porta con cui CAS si lega."""
+    svc = _compose_config()["services"]["cas-service"]
+    cmd = " ".join(svc["healthcheck"]["test"])
     assert cmd.startswith("CMD /app/.venv/bin/python -c")
-    assert "localhost:8769/health" in cmd
+    assert "localhost" not in cmd
+    assert "CAS_HOST" in cmd and "CAS_PORT" in cmd
+    assert svc["environment"]["CAS_HOST"] == "127.0.0.1" and svc["environment"]["CAS_PORT"] == "8769"
+
+
+class _Health(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, *args):
+        pass
+
+
+class _HTTPv6(HTTPServer):
+    address_family = socket.AF_INET6
+
+
+# Risoluzione di `localhost` come negli host con `::1 localhost` in /etc/hosts: prima ::1, poi 127.0.0.1.
+_IPV6_FIRST = """\
+import socket
+_orig = socket.getaddrinfo
+
+
+def getaddrinfo(host, port, *args, **kwargs):
+    if host == "localhost":
+        return [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("::1", port, 0, 0)),
+                (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", port))]
+    return _orig(host, port, *args, **kwargs)
+
+
+socket.getaddrinfo = getaddrinfo
+"""
+
+
+def _healthcheck_exit(server_cls, host: str, tmp_path) -> int:
+    """Esegue il comando del healthcheck da Compose con un solo listener, su `host`, che risponde 200."""
+    (tmp_path / "sitecustomize.py").write_text(_IPV6_FIRST)
+    try:
+        server = server_cls((host, 0), _Health)
+    except OSError:
+        pytest.skip(f"{host} non disponibile su questo host")
+    threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+    try:
+        port = server.server_address[1]
+        svc = _compose_config({"CAS_DOCKER_PORT": str(port)})["services"]["cas-service"]
+        env = {k: v for k, v in svc["environment"].items() if isinstance(v, str)} | {"PYTHONPATH": str(tmp_path)}
+        argv = [sys.executable, *svc["healthcheck"]["test"][2:]]
+        return subprocess.run(argv, env=env, capture_output=True, timeout=30, check=False).returncode
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_healthcheck_is_not_certified_by_another_service_on_ipv6_loopback(tmp_path):
+    """M3: in rete host un altro server su ::1 con la stessa porta non deve far risultare sano CAS (che ascolta su 127.0.0.1)."""
+    assert _healthcheck_exit(_HTTPv6, "::1", tmp_path) != 0
+
+
+def test_healthcheck_succeeds_on_the_ipv4_listener_cas_binds(tmp_path):
+    assert _healthcheck_exit(HTTPServer, "127.0.0.1", tmp_path) == 0
 
 
 def test_docker_compose_mounts_host_matlab_installation_into_container():

@@ -42,8 +42,8 @@ def _wait(sv, listing, *, inodes=None, health=lambda: True, timeout_s=180, step=
     clock = iter(range(0, 100000, step))
     return sv.wait_ready(
         PORT,
-        list_listeners=listing,
-        container_inodes=lambda: {INODE} if inodes is None else inodes,
+        list_listeners=lambda timeout: listing(),
+        container_inodes=lambda timeout: {INODE} if inodes is None else inodes,
         health=health,
         sleep=lambda s: None,
         now=lambda: next(clock),
@@ -146,3 +146,52 @@ def test_workflow_resolves_port_once_for_compose_and_checks():
 def test_health_url_is_loopback_on_the_same_port():
     sv = _load()
     assert sv.health_url(PORT) == f"http://127.0.0.1:{PORT}/health"
+
+
+# --- LOW: ogni comando esterno e' limitato dalla scadenza dell'attesa e, scaduto, il controllo fallisce chiuso ---
+
+
+def test_wait_gives_every_probe_the_time_left_before_the_wait_deadline():
+    sv = _load()
+    seen = []
+    clock = iter(range(0, 100000, 3))
+
+    def listing(timeout):
+        seen.append(("ss", timeout))
+        return _ss("127.0.0.1")
+
+    def inodes(timeout):
+        seen.append(("exec", timeout))
+        return {INODE}
+
+    sv.wait_ready(PORT, list_listeners=listing, container_inodes=inodes, health=lambda: True,
+                  sleep=lambda s: None, now=lambda: next(clock), timeout_s=60)
+    assert [name for name, _ in seen] == ["ss", "exec"]
+    assert all(0 < t <= 60 for _, t in seen)
+
+
+def test_external_commands_run_with_a_timeout(monkeypatch):
+    sv = _load()
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd[0], kwargs.get("timeout")))
+        out = '{"services": {"cas-service": {"environment": {"CAS_PORT": "8769"}}}}' if "compose" in cmd else ""
+        return type("R", (), {"stdout": out})()
+
+    monkeypatch.setattr(sv.subprocess, "run", fake_run)
+    sv._ss(PORT, 7)
+    sv._container_inodes("c", 8)
+    assert sv.main(["port"]) == 0
+    assert calls == [("ss", 7), ("docker", 8), ("docker", sv.DEFAULT_TIMEOUT_S)]
+
+
+@pytest.mark.parametrize("argv", [["preflight", "--port", "8769"], ["port"]])
+def test_a_stuck_command_fails_closed(monkeypatch, argv):
+    sv = _load()
+
+    def stuck(cmd, **kwargs):
+        raise sv.subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(sv.subprocess, "run", stuck)
+    assert sv.main(argv) == 1
