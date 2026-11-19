@@ -195,3 +195,21 @@ def test_a_stuck_command_fails_closed(monkeypatch, argv):
 
     monkeypatch.setattr(sv.subprocess, "run", stuck)
     assert sv.main(argv) == 1
+
+
+def test_each_probe_gets_the_time_left_after_the_previous_one():
+    sv = _load()
+    seen = {}
+    clock = iter(range(0, 100000, 10))
+
+    def listing(timeout):
+        seen["ss"] = timeout
+        return _ss("127.0.0.1")
+
+    def inodes(timeout):
+        seen["exec"] = timeout
+        return {INODE}
+
+    sv.wait_ready(PORT, list_listeners=listing, container_inodes=inodes, health=lambda: True,
+                  sleep=lambda s: None, now=lambda: next(clock), timeout_s=100)
+    assert seen["exec"] < seen["ss"]

@@ -92,7 +92,7 @@ socket.getaddrinfo = getaddrinfo
 """
 
 
-def _healthcheck_exit(server_cls, host: str, tmp_path) -> int:
+def _healthcheck_exit(server_cls, host: str, tmp_path, extra_env: dict[str, str] | None = None) -> int:
     """Esegue il comando del healthcheck da Compose con un solo listener, su `host`, che risponde 200."""
     (tmp_path / "sitecustomize.py").write_text(_IPV6_FIRST)
     try:
@@ -103,7 +103,7 @@ def _healthcheck_exit(server_cls, host: str, tmp_path) -> int:
     try:
         port = server.server_address[1]
         svc = _compose_config({"CAS_DOCKER_PORT": str(port)})["services"]["cas-service"]
-        env = {k: v for k, v in svc["environment"].items() if isinstance(v, str)} | {"PYTHONPATH": str(tmp_path)}
+        env = {k: v for k, v in svc["environment"].items() if isinstance(v, str)} | {"PYTHONPATH": str(tmp_path)} | (extra_env or {})
         argv = [sys.executable, *svc["healthcheck"]["test"][2:]]
         return subprocess.run(argv, env=env, capture_output=True, timeout=30, check=False).returncode
     finally:
@@ -148,3 +148,9 @@ def test_docker_compose_caps_memory_without_swap_and_uses_host_network_on_loopba
     assert svc["pull_policy"] == "build"
     assert "ports" not in svc and "extra_hosts" not in svc
     assert svc["environment"]["CAS_HOST"] == "127.0.0.1"
+
+
+def test_healthcheck_ignores_http_proxies_injected_in_the_container(tmp_path):
+    """Docker puo' iniettare HTTP_PROXY: la sonda su 127.0.0.1 deve restare diretta, come la verifica del sandbox."""
+    proxy = {"HTTP_PROXY": "http://127.0.0.1:9", "http_proxy": "http://127.0.0.1:9", "NO_PROXY": "localhost"}
+    assert _healthcheck_exit(HTTPServer, "127.0.0.1", tmp_path, proxy) == 0
