@@ -9,7 +9,7 @@ on:
         type: string
         default: '["self-hosted","linux","ws"]'
       rebuild_image:
-        description: Rebuild Docker image before validation
+        description: Ignored, the image is always rebuilt (host networking needs the current CAS_HOST support)
         required: true
         type: boolean
         default: false
@@ -38,10 +38,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ inputs.rebuild_image }}" = "true" ]; then
-            docker compose up -d --build
-          else
-            docker compose up -d
+          # Sempre --build: in rete host un'immagine vecchia ignorerebbe CAS_HOST e ascolterebbe su 0.0.0.0.
+          docker compose up -d --build
+
+      - name: Verify the compose container owns the loopback listener
+        shell: bash
+        run: |
+          set -euo pipefail
+          port="${CAS_DOCKER_PORT:-8769}"
+          test -n "$(docker compose ps --status running -q cas-service)"
+          listeners="$(ss -ltn "sport = :$port" | tail -n +2)"
+          echo "$listeners"
+          echo "$listeners" | grep -q "127.0.0.1:$port"
+          if echo "$listeners" | grep -Eq "(0\.0\.0\.0|\*|\[::\]):$port"; then
+            echo "listener non solo su loopback (o servizio precedente ancora attivo)"; exit 1
           fi
 
       - name: Wait for CAS health endpoint
