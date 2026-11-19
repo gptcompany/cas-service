@@ -57,8 +57,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Sempre --build: in rete host un'immagine vecchia ignorerebbe CAS_HOST e ascolterebbe su 0.0.0.0.
-          docker compose up -d --build
+          # L'immagine e' gia' stata costruita sopra (sempre ricostruita): in rete host un'immagine vecchia ignorerebbe CAS_HOST e ascolterebbe su 0.0.0.0.
+          docker compose up -d --no-build
 
       - name: Wait for the compose container to own the loopback listener and serve health
         shell: bash
