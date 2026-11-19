@@ -73,3 +73,13 @@ def test_docker_compose_honors_explicit_docker_port_override():
     assert env["CAS_PORT"] == "9000"
     assert svc["ports"][0]["published"] == "9000"
     assert svc["ports"][0]["target"] == 9000
+
+
+def test_docker_compose_caps_memory_without_swap_and_binds_loopback():
+    """F-775: limite di isolamento 4g (decisione limiti-risorse-calcolo-agenti), niente swap, solo 127.0.0.1."""
+    svc = _compose_config()["services"]["cas-service"]
+
+    assert int(svc["mem_limit"]) == 4 * 1024**3
+    assert int(svc["memswap_limit"]) == int(svc["mem_limit"])
+    assert svc["restart"] == "unless-stopped"
+    assert all(p["host_ip"] == "127.0.0.1" for p in svc["ports"])
