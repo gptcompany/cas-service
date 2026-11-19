@@ -27,8 +27,10 @@ services:
         source: ${CAS_DOCKER_MATLAB_HOST_PATH:-/media/sam/3TB-WDC/matlab2025}
         target: /opt/matlab
         read_only: true
+    # Stesso indirizzo IPv4 e stessa porta con cui CAS si lega (CAS_HOST/CAS_PORT dell'ambiente del container): in
+    # rete host `localhost` puo' risolversi in ::1 e un altro servizio li' certificherebbe CAS.
     healthcheck:
-      test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${CAS_DOCKER_PORT:-8769}/health')"]
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import os, urllib.request as u; u.urlopen('http://%s:%s/health' % (os.environ['CAS_HOST'], os.environ['CAS_PORT']))"]
       interval: 30s
       timeout: 5s
       retries: 3

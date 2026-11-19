@@ -85,8 +85,8 @@ def health_url(port: int) -> str:
 def wait_ready(
     port: int,
     *,
-    list_listeners: Callable[[], str],
-    container_inodes: Callable[[], set[int]],
+    list_listeners: Callable[[float], str],
+    container_inodes: Callable[[float], set[int]],
     health: Callable[[], bool],
     sleep: Callable[[float], None] = time.sleep,
     now: Callable[[], float] = time.monotonic,
@@ -94,7 +94,9 @@ def wait_ready(
 ) -> str:
     start = now()
     while True:
-        state = listener_state(parse_ss(list_listeners()), container_inodes(), port)
+        # Ogni comando esterno ha per tetto il tempo che resta all'attesa: scaduto, il controllo fallisce chiuso.
+        left = max(timeout_s - (now() - start), 0.001)
+        state = listener_state(parse_ss(list_listeners(left)), container_inodes(left), port)
         if state == "owned":
             if health():
                 log(f"ready: listener del container su {LOOPBACK}:{port} e /health ok")
@@ -107,19 +109,21 @@ def wait_ready(
         sleep(POLL_S)
 
 
-def _ss(port: int) -> str:
-    res = subprocess.run(["ss", "-ltnHe", f"sport = :{port}"], capture_output=True, text=True, check=True)
-    return res.stdout
+def _run(cmd: list[str], timeout: float) -> str:
+    """Comando esterno con tetto di tempo: un comando fermo non deve superare la scadenza dell'attesa."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout).stdout
+    except subprocess.TimeoutExpired as exc:
+        raise SandboxError(f"comando fermo oltre {timeout:.0f}s: {' '.join(cmd[:2])}") from exc
 
 
-def _container_inodes(container: str) -> set[int]:
-    res = subprocess.run(
-        ["docker", "exec", container, "/app/.venv/bin/python", "-c", _INODE_SNIPPET],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return {int(x) for x in res.stdout.split()}
+def _ss(port: int, timeout: float) -> str:
+    return _run(["ss", "-ltnHe", f"sport = :{port}"], timeout)
+
+
+def _container_inodes(container: str, timeout: float) -> set[int]:
+    out = _run(["docker", "exec", container, "/app/.venv/bin/python", "-c", _INODE_SNIPPET], timeout)
+    return {int(x) for x in out.split()}
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -154,18 +158,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.cmd == "port":
-            cfg = subprocess.run(
-                ["docker", "compose", "config", "--format", "json"], capture_output=True, text=True, check=True
-            )
-            print(port_from_compose(cfg.stdout))
+            print(port_from_compose(_run(["docker", "compose", "config", "--format", "json"], DEFAULT_TIMEOUT_S)))
         elif args.cmd == "preflight":
-            check_preflight(parse_ss(_ss(args.port)), args.port)
+            check_preflight(parse_ss(_ss(args.port, DEFAULT_TIMEOUT_S)), args.port)
             log(f"porta {args.port} libera")
         else:
             wait_ready(
                 args.port,
-                list_listeners=lambda: _ss(args.port),
-                container_inodes=lambda: _container_inodes(args.container),
+                list_listeners=lambda t: _ss(args.port, t),
+                container_inodes=lambda t: _container_inodes(args.container, t),
                 health=lambda: _health(args.port),
                 timeout_s=args.timeout,
             )
