@@ -38,13 +38,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Compose, listener e salute leggono tutti CAS_DOCKER_PORT.
-          echo "CAS_DOCKER_PORT=${CAS_DOCKER_PORT:-8769}" >> "$GITHUB_ENV"
+          # Fonte unica: la porta effettiva e' quella risolta da Compose (env, .env o default del file);
+          # listener e salute la leggono da CAS_DOCKER_PORT.
+          port="$(python3 scripts/sandbox_verify.py port)"
+          echo "CAS_DOCKER_PORT=$port" >> "$GITHUB_ENV"
 
       - name: Require a free port before start
         shell: bash
         run: |
           set -euo pipefail
+          # Prima si costruisce l'immagine: un build fallito non deve lasciare il servizio spento.
+          docker compose build
           # Si ferma lo stack di questo progetto (se c'e'): ogni altro occupante della porta e' un servizio precedente.
           docker compose down
           python3 scripts/sandbox_verify.py preflight --port "$CAS_DOCKER_PORT"

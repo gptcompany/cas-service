@@ -8,6 +8,7 @@ solo su 127.0.0.1, e solo dopo interroga /health.
 """
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -72,6 +73,11 @@ def listener_state(listeners: list[Listener], inodes: set[int], port: int) -> st
     return "owned"
 
 
+def port_from_compose(config_json: str) -> int:
+    """Porta effettiva risolta da Compose: unica fonte per listener e salute."""
+    return int(json.loads(config_json)["services"]["cas-service"]["environment"]["CAS_PORT"])
+
+
 def health_url(port: int) -> str:
     return f"http://{LOOPBACK}:{port}/health"
 
@@ -116,9 +122,19 @@ def _container_inodes(container: str) -> set[int]:
     return {int(x) for x in res.stdout.split()}
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def direct_opener() -> urllib.request.OpenerDirector:
+    """Niente proxy ne' redirect: conta solo la risposta del socket verificato."""
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
+
+
 def _health(port: int) -> bool:
     try:
-        with urllib.request.urlopen(health_url(port), timeout=5) as resp:
+        with direct_opener().open(health_url(port), timeout=5) as resp:
             return resp.status == 200
     except OSError as exc:
         log(f"health: {exc}")
@@ -128,6 +144,7 @@ def _health(port: int) -> bool:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("port")
     for name in ("preflight", "wait"):
         p = sub.add_parser(name)
         p.add_argument("--port", type=int, required=True)
@@ -136,7 +153,12 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_S)
     args = parser.parse_args(argv)
     try:
-        if args.cmd == "preflight":
+        if args.cmd == "port":
+            cfg = subprocess.run(
+                ["docker", "compose", "config", "--format", "json"], capture_output=True, text=True, check=True
+            )
+            print(port_from_compose(cfg.stdout))
+        elif args.cmd == "preflight":
             check_preflight(parse_ss(_ss(args.port)), args.port)
             log(f"porta {args.port} libera")
         else:
